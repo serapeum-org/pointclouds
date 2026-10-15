@@ -197,13 +197,23 @@ pointclouds = { path = ".", editable = true }
 # vendors its own osgeo and `import pyramids` prepends that directory to
 # `sys.path`, so a conda GDAL would be installed and never imported.
 
-[tool.pixi.tasks]
+# Tasks live on the features that can actually run them, never on the default
+# feature. A task declared there exists in every environment, including `docs`,
+# `notebook` and `default`, which carry no pytest - and pixi does not fail in
+# that state, it runs whatever `pytest` is first on PATH:
+#
+#   $ pixi run -e docs main
+#   E   ModuleNotFoundError: No module named 'laspy'
+#   $ pixi run -e docs python -c "import shutil; print(shutil.which('pytest'))"
+#   C:\miniforge\envs\py312\Scripts\pytest.EXE     <- an unrelated environment
+#
+[tool.pixi.feature.dev.tasks]
 # `main` is the core suite: the GDAL-free install, with the extras deselected by
 # marker. It runs in every pyXXX environment, none of which carries `gis` or
 # `cloud`, so an accidental import of pyramids fails the run rather than passing
 # quietly on a machine that happens to have it.
-main = { cmd = "pytest -vvv --cov=src/pointclouds -sv -m 'not gis and not cloud' --cov-report=xml", description = "Run the core test suite (no extras)" }
-test-all = { cmd = "pytest -vvv --cov=src/pointclouds -sv --cov-report=xml --cov-report=term-missing", description = "Run the whole test suite (needs the `full` environment)" }
+main = { cmd = "pytest -vvv --cov=src/pointclouds -m 'not gis and not cloud' --cov-report=xml --junitxml=junit.xml -o junit_family=legacy", description = "Run the core test suite (no extras)" }
+test-all = { cmd = "pytest -vvv --cov=src/pointclouds --cov-report=xml --cov-report=term-missing", description = "Run the whole test suite (use -e full, or the gis/cloud tests skip)" }
 notebooks = { cmd = "pytest --nbval --nbval-lax --verbose docs/examples", description = "check notebooks" }
 doctest = { cmd = "pytest --doctest-modules src/pointclouds -p no:cacheprovider", description = "Run the src doctests" }
 typecheck = { cmd = "mypy src/pointclouds", description = "Type check the package" }
@@ -213,11 +223,15 @@ publish-pypi = { cmd = "twine upload --non-interactive --repository pypi dist/*"
 cz-changelog = { cmd = "cz changelog", description = "Generate the changelog with commitizen" }
 cz-bump = { cmd = "cz bump", description = "Bump the version with commitizen" }
 
+[tool.pixi.feature.docs.tasks]
+docs-build = { cmd = "mkdocs build --strict", description = "Build the docs site, failing on any warning" }
+docs-serve = { cmd = "mkdocs serve", description = "Serve the docs site with live reload" }
+
 [tool.pixi.environments]
 default = { features = ["py314"], solve-group = "default" }
 dev = { features = ["py314", "dev"], solve-group = "default" }
 docs = { features = ["py314", "docs"], solve-group = "default" }
-notebook = { features = ["py314", "notebook"], solve-group = "default" }
+notebook = { features = ["py314", "dev", "notebook"], solve-group = "default" }
 # The one environment that carries the optional stacks, and the only place
 # `pytest -m gis` can pass. Kept on 3.12: pyramids-gis publishes cp311-cp314
 # wheels, and 3.12 is the version its own CI exercises most.
