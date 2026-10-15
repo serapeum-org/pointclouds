@@ -17,6 +17,17 @@ jobs:
   pip-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The floor and the ceiling of requires-python. uv.lock is a universal
+        # resolution, so a handful of packages (numpy, scipy, pyproj, ...) are
+        # pinned twice behind mutually exclusive markers - 3.11 resolves the
+        # oldest dependency set the project supports, which is the one most
+        # likely to carry a known advisory, and 3.14 resolves the newest. One
+        # interpreter alone would leave the other version unaudited.
+        python-version: ["3.11", "3.14"]
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -31,26 +42,29 @@ jobs:
         #   git ls-remote --tags https://github.com/serapeum-org/github-actions
         uses: serapeum-org/github-actions/actions/python-setup/uv@38c111084f99d5ff5f4a1e63bedce48fe33a10c0  # uv/v1.2.1
         with:
-          # 3.11 is the floor of requires-python, so it resolves the oldest
-          # dependency set the project supports - the one most likely to carry a
-          # known advisory.
-          python-version: "3.11"
-          install-groups: "groups: dev"
+          python-version: ${{ matrix.python-version }}
+          # No dependency group is installed: the audit reads uv.lock through
+          # `uv export` and never imports the project.
+          install-groups: ""
           cache: true
           verify-lock: true
           # Must match the uv pinned in tests.yml.
           version: "0.12.1"
 
-      # The audited set is the whole lock: every group and every extra, so the
-      # optional pyramids and cloud paths are covered too. The export is already
-      # fully pinned, hence --no-deps; the sed drops environment markers and the
-      # grep keeps only name==version lines, since pip-audit rejects a
-      # requirements file holding direct URLs or local paths.
+      # The audited set is the whole lock - every group and every extra, so the
+      # optional pyramids and cloud paths are covered too. Environment markers
+      # are deliberately KEPT: the export is universal, so stripping them leaves
+      # two pins of the same package in one file and pip refuses it with
+      # `ResolutionImpossible`. pip evaluates the markers against the audit
+      # interpreter instead, which is why the matrix above exists. The grep
+      # keeps only name==version lines, since pip-audit rejects a requirements
+      # file holding direct URLs or local paths, and the export is already fully
+      # pinned, hence --no-deps.
       - name: Audit dependencies with pip-audit
         run: |
           uv export --frozen --all-extras --all-groups --no-emit-project \
             --no-hashes --no-annotate --no-header \
-            | sed -e 's/[[:space:]]*;.*$//' -e '/^#/d' \
-            | grep -E '^[A-Za-z0-9_.-]+==' | sort -u > "${RUNNER_TEMP}/pip-audit-reqs.txt"
-          echo "Auditing $(wc -l < "${RUNNER_TEMP}/pip-audit-reqs.txt") pinned packages against the advisory DB"
-          pipx run pip-audit --requirement "${RUNNER_TEMP}/pip-audit-reqs.txt" --no-deps --desc
+            | grep -E '^[A-Za-z0-9_.-]+==' > "${RUNNER_TEMP}/pip-audit-reqs.txt"
+          echo "Auditing $(wc -l < "${RUNNER_TEMP}/pip-audit-reqs.txt") requirement lines on Python ${{ matrix.python-version }}"
+          uvx --python ${{ matrix.python-version }} pip-audit \
+            --requirement "${RUNNER_TEMP}/pip-audit-reqs.txt" --no-deps --desc
