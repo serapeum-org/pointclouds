@@ -17,5 +17,5 @@ paths = [
   # PR review artifacts written into the repo root are working documents.
   '''pr-diff-review-.*\.md$''',
   # The dependency lockfile is package hashes, not credentials.
-  '''uv\.lock$''',
+  '''pixi\.lock$''',
 ]

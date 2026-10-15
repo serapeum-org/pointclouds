@@ -1,0 +1,17 @@
+# SCM syntax highlighting & preventing 3-way merges
+# pixi.lock is machine-generated and ~10k lines. `merge=binary` stops git from
+# attempting a three-way merge on it: a conflict there is never worth resolving
+# by hand - take one side and re-run `pixi lock` against the merged manifest.
+# The linguist hints keep it out of the repo's language statistics and collapse
+# it in GitHub diffs.
+pixi.lock merge=binary linguist-language=YAML linguist-generated=true
+
+# Notebooks are LF-normalised JSON, which is what the nbstripout pre-commit hook
+# and the CI `notebooks` task produce. Without this pin a Windows checkout
+# rewrites every line, so every notebook under `docs/examples/` shows up as a
+# full-file diff.
+*.ipynb text eol=lf
+
+# The committed LAS/LAZ fixtures are binary: never touch their line endings.
+*.las binary
+*.laz binary

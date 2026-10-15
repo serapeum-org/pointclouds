@@ -10,17 +10,19 @@ on:
   pull_request:
 
 jobs:
-  # The GDAL-free core: install WITHOUT the [gis]/[cloud] extras and prove the
-  # package reads, filters, decimates and grids with no pyramids and no GDAL.
-  # This is the matrix that matters - the core is pure PyPI wheels, so it is
-  # expected to pass on every OS and every supported interpreter.
+  # The GDAL-free core. None of the pyXXX environments carries the `gis` or
+  # `cloud` feature, so this matrix installs no pyramids and no GDAL at all -
+  # the `main` task additionally deselects those markers, and an accidental
+  # import would fail here rather than pass on a machine that happens to have
+  # the stack. This is the matrix that matters: the core is pure PyPI wheels,
+  # so it is expected to pass on every OS and every supported interpreter.
   core:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        python-version: ["3.11", "3.12", "3.13", "3.14"]
+        environment: [py311, py312, py313, py314]
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -29,38 +31,33 @@ jobs:
 
       - name: Set up Python
         # serapeum-org/github-actions is a monorepo: one commit carries the release tag
-        # for every action in it, so 38c11108 is the dereferenced commit for uv/v1.2.1,
+        # for every action in it, so 38c11108 is the dereferenced commit for pixi/v1.2.1,
         # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
         # different actions pinned to one SHA reads like a copy-paste error and is not;
         # verify with
         #   git ls-remote --tags https://github.com/serapeum-org/github-actions
-        uses: serapeum-org/github-actions/actions/python-setup/uv@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # uv/v1.2.1
+        uses: serapeum-org/github-actions/actions/python-setup/pixi@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # pixi/v1.2.1
         with:
-          python-version: ${{ matrix.python-version }}
-          install-groups: "groups: dev"
+          environments: ${{ matrix.environment }}
+          activate-environment: ${{ matrix.environment }}
           cache: true
-          verify-lock: true
-          # Pin the same uv that writes uv.lock locally, so CI and local stay in
-          # lockstep: the lock carries a revision marker an older uv refuses to
-          # read, and verify-lock above would fail on a rewrite. Bump together.
-          version: "0.12.1"
+          # Pin the same pixi that writes pixi.lock locally: the lock is format
+          # v7, which older pixi refuses to read. Bump this, github-release.yml
+          # and the local toolchain together when the format moves again.
+          version: v0.73.0
 
-      - name: Run core tests (no extras)
-        run: |
-          uv run --frozen pytest -vvv -m "not gis and not cloud" --cov=src/pointclouds --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
+      - name: Run core tests
+        run: pixi run -e ${{ matrix.environment }} main
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
 
-  # Everything else: install the extras so the pyramids converters and the
-  # cloud paths run. One runner is enough - the extras carry their own platform
-  # matrix upstream, and pyramids-gis publishes cp311-cp314 wheels only.
+  # Everything else: the one environment carrying the optional stacks, so the
+  # pyramids converters and the cloud paths run and `pytest -m gis` is not
+  # skipped. One runner is enough - the extras carry their own platform matrix
+  # upstream, and pyramids-gis publishes cp311-cp314 wheels only.
   full:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.12"]
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -68,17 +65,15 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        uses: serapeum-org/github-actions/actions/python-setup/uv@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # uv/v1.2.1
+        uses: serapeum-org/github-actions/actions/python-setup/pixi@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # pixi/v1.2.1
         with:
-          python-version: ${{ matrix.python-version }}
-          install-groups: "groups: dev"
+          environments: full
+          activate-environment: full
           cache: true
-          verify-lock: true
-          version: "0.12.1"
+          version: v0.73.0
 
-      - name: Run full suite (with extras)
-        run: |
-          uv run --frozen --all-extras pytest -vvv --cov=src/pointclouds --cov-report=xml --cov-report=term-missing
+      - name: Run the whole suite
+        run: pixi run -e full test-all
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
@@ -91,7 +86,7 @@ jobs:
         # gating the suite on a directory that is not populated yet.
         run: |
           set +e
-          uv run --frozen --all-extras pytest --nbval --nbval-lax --verbose docs/examples
+          pixi run -e full notebooks
           rc=$?
           if [ $rc -eq 4 ] || [ $rc -eq 5 ]; then exit 0; fi
           exit $rc

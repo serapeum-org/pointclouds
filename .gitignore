@@ -10,6 +10,11 @@ dist/
 .venv/
 venv/
 
+# pixi working directory - environments, task cache and the local
+# detached-environments config. The environments themselves live under
+# C:/python-environments/pixi/envs. pixi.lock itself IS tracked.
+.pixi/
+
 # test / coverage
 .pytest_cache/
 .mypy_cache/

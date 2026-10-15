@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
 
       # serapeum-org/github-actions is a monorepo: one commit carries the release tag
-      # for every action in it, so 38c11108 is the dereferenced commit for uv/v1.2.1,
+      # for every action in it, so 38c11108 is the dereferenced commit for pixi/v1.2.1,
       # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
       # different actions pinned to one SHA reads like a copy-paste error and is not;
       # verify with
@@ -36,10 +36,9 @@ jobs:
       - uses: serapeum-org/github-actions/actions/mkdocs-deploy@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # mkdocs/v1.3.1
         with:
           trigger: 'pull_request'
-          package-manager: 'uv'
-          package-manager-version: '0.12.1'
-          python-version: '3.12'
-          install-groups: 'groups: docs'
+          package-manager: 'pixi'
+          package-manager-version: 'v0.73.0'
+          install-groups: 'docs'
           deploy-token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
 
   deploy-main:
@@ -52,10 +51,9 @@ jobs:
     - uses: serapeum-org/github-actions/actions/mkdocs-deploy@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # mkdocs/v1.3.1
       with:
         trigger: 'main'
-        package-manager: 'uv'
-        package-manager-version: '0.12.1'
-        python-version: '3.12'
-        install-groups: 'groups: docs'
+        package-manager: 'pixi'
+        package-manager-version: 'v0.73.0'
+        install-groups: 'docs'
         deploy-token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
 
   deploy-release:
@@ -85,10 +83,9 @@ jobs:
     - uses: serapeum-org/github-actions/actions/mkdocs-deploy@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # mkdocs/v1.3.1
       with:
         trigger: 'release'
-        package-manager: 'uv'
-        package-manager-version: '0.12.1'
-        python-version: '3.12'
-        install-groups: 'groups: docs'
+        package-manager: 'pixi'
+        package-manager-version: 'v0.73.0'
+        install-groups: 'docs'
         deploy-token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
         release-tag: ${{ github.event.release.tag_name || steps.version.outputs.tag }}
         mike-alias: 'latest'
