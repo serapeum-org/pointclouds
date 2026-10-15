@@ -10,9 +10,11 @@ dist/
 .venv/
 venv/
 
-# pixi working directory - environments, task cache and the local
-# detached-environments config. The environments themselves live under
-# C:/python-environments/pixi/envs. pixi.lock itself IS tracked.
+# pixi working directory: environments, task cache, and config.toml.
+# All of it is ignored, config.toml included - it holds a machine-specific
+# absolute path (`detached-environments`), so committing it would impose one
+# developer's layout on every clone and on CI. See docs/contributing.md for
+# the one-line local setup. pixi.lock itself IS tracked.
 .pixi/
 
 # test / coverage
@@ -38,6 +40,3 @@ CLAUDE.md
 # IDE
 .idea/
 .vscode/
-# pixi environments
-.pixi/*
-!.pixi/config.toml
