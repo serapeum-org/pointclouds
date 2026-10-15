@@ -1,5 +1,5 @@
 # Gitleaks configuration for the CI secret scan (`gitleaks dir` in
-# .github/workflows/lint.yml). gitleaks is the repo's single secret scanner,
+# .github/workflows/lint.yml, which passes it as `-c .github/gitleaks.toml`). gitleaks is the repo's single secret scanner,
 # matching pyramids, pyramids-eo and pyramids-mesh. There is no local gitleaks
 # pre-commit hook here, so this file is read only by that job. It keeps
 # gitleaks' full built-in ruleset and only allowlists paths that are registries

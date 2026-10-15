@@ -54,25 +54,27 @@ jobs:
           # pixi.lock is lock-file format v7, which older pixi refuses to read.
           version: v0.73.0
 
-      # The inventory comes from `pixi list`, not `pip freeze`: `pip` is only in
-      # the `dev` dependency group, so a `python -m pip freeze` in the `docs`
-      # environment prints nothing and the job would audit an empty file and
-      # pass. `pixi list` needs nothing installed inside the environment and is
-      # the manager's own record of what it put there.
+      # The inventory comes from `pixi list`, not `pip freeze`, for two reasons:
+      # `pip` is only in the `dev` dependency group, so `python -m pip freeze`
+      # in the `docs` environment prints nothing and the job would audit an
+      # empty file and pass; and pip reads the user site-packages, so it reports
+      # packages the environment does not contain. `pixi list` is the manager's
+      # own record and needs nothing installed inside the environment.
       #
-      # Only `kind == "pypi"` entries are kept: pip-audit resolves names against
-      # PyPI, and the conda packages in a pixi environment (python, openssl,
-      # libzlib, ...) are not PyPI projects. Each line is already pinned to one
-      # version, so the file can never conflict with itself.
+      # Only `kind == "pypi"` entries with a version survive: pip-audit resolves
+      # names against PyPI, where the conda packages (python, openssl, ...) are
+      # not projects, and the editable self-install carries no version.
       #
-      # `--no-deps` is what makes the audit independent of whichever interpreter
+      # `test -s` is the guard that matters - an empty requirements file makes
+      # pip-audit report success, so a mis-piped command would look like a clean
+      # scan. `--no-deps` keeps the result independent of whichever interpreter
       # pipx picks: the file is fully pinned, so pip-audit looks each package up
-      # in the advisory DB instead of resolving and installing the set in a
-      # throwaway venv under the runner's default Python. Without it the job
-      # fails on a resolution conflict rather than reporting advisories.
+      # in the advisory DB instead of resolving the set in a throwaway venv.
       - name: Audit dependencies with pip-audit
         run: |
           pixi list -e ${{ matrix.environment }} --json \
-            | python ci/pixi_list_to_requirements.py > "${RUNNER_TEMP}/pip-audit-reqs.txt"
+            | python -c "import json,sys; [print(p['name']+'=='+p['version']) for p in sorted(json.load(sys.stdin), key=lambda q: q['name']) if p.get('kind')=='pypi' and p.get('version')]" \
+            > "${RUNNER_TEMP}/pip-audit-reqs.txt"
+          test -s "${RUNNER_TEMP}/pip-audit-reqs.txt"
           echo "Auditing $(wc -l < "${RUNNER_TEMP}/pip-audit-reqs.txt") pinned packages from the ${{ matrix.environment }} environment"
           pipx run pip-audit --requirement "${RUNNER_TEMP}/pip-audit-reqs.txt" --no-deps --desc

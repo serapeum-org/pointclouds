@@ -140,9 +140,7 @@ style = [
 ]
 
 [tool.pytest.ini_options]
-# `ci` is on the path so tests/test_pixi_list_to_requirements.py can import the
-# pip-audit input script, which is a plain module rather than part of the package.
-pythonpath = ["src", "ci"]
+pythonpath = ["src"]
 testpaths = ["tests"]
 markers = [
     "gis: needs the [gis] extra (pyramids-gis) - deselect with '-m \"not gis\"'",
