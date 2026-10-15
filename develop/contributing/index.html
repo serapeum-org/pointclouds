@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -799,6 +799,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="./" class="md-nav__link md-nav__link--active">
         
   
@@ -815,6 +833,69 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#development-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environments-and-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environments and tasks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you push
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#house-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        House rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1014,6 +1095,58 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#development-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development environment
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#environments-and-tasks" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Environments and tasks
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#before-you-push" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before you push
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#house-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        House rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1047,6 +1180,82 @@
 
 <h1 id="contributing"><a class="toclink" href="#contributing">Contributing</a><a class="headerlink" href="#contributing" title="Permanent link">#</a></h1>
 <p>See the repo README and <code>planning/placement-decision.md</code>.</p>
+<h2 id="development-environment"><a class="toclink" href="#development-environment">Development environment</a><a class="headerlink" href="#development-environment" title="Permanent link">#</a></h2>
+<p>The repo is managed with <a href="https://pixi.sh">pixi</a>; <code>pixi.lock</code> is committed and CI installs from it. Everything
+below assumes pixi 0.73 or newer — that is the version pinned in the workflows, and the lock is format v7, which
+older pixi refuses to read.</p>
+<p><strong>Before the first <code>pixi install</code>, decide where the environments go.</strong> The manifest declares nine of them, and a
+full set is several GB. By default pixi materialises them in <code>.pixi/envs/</code> inside the checkout, which is the
+wrong place if your clone lives in a synced folder (OneDrive, Dropbox, Google Drive): the sync client locks files
+mid-install and you get permission errors on the next install or clean. Point pixi somewhere outside the tree
+instead:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pixi<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--local<span class="w"> </span>detached-environments<span class="w"> </span><span class="s2">"C:/python-environments/pixi/envs"</span><span class="w">   </span><span class="c1"># Windows</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pixi<span class="w"> </span>config<span class="w"> </span><span class="nb">set</span><span class="w"> </span>--local<span class="w"> </span>detached-environments<span class="w"> </span><span class="s2">"</span><span class="nv">$HOME</span><span class="s2">/.cache/pixi/envs"</span><span class="w">            </span><span class="c1"># Linux / macOS</span>
+</code></pre></div>
+<p>That writes <code>.pixi/config.toml</code>, which is <strong>deliberately not tracked</strong> — it holds an absolute path specific to
+your machine. CI sets nothing and uses the default location, which is correct there.</p>
+<h2 id="environments-and-tasks"><a class="toclink" href="#environments-and-tasks">Environments and tasks</a><a class="headerlink" href="#environments-and-tasks" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>environment</th>
+<th>what it is for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>dev</code></td>
+<td>the day-to-day environment: the package plus the <code>dev</code> tooling, on Python 3.14</td>
+</tr>
+<tr>
+<td><code>py311</code> … <code>py314</code></td>
+<td>the CI test matrix, one per supported interpreter</td>
+</tr>
+<tr>
+<td><code>full</code></td>
+<td><code>dev</code> plus the <code>gis</code> and <code>cloud</code> extras — the only environment where <code>pytest -m gis</code> can run</td>
+</tr>
+<tr>
+<td><code>docs</code></td>
+<td>MkDocs, mkdocstrings and mike</td>
+</tr>
+<tr>
+<td><code>notebook</code></td>
+<td><code>dev</code> plus JupyterLab, for interactive work</td>
+</tr>
+<tr>
+<td><code>default</code></td>
+<td>the package alone, with no tooling</td>
+</tr>
+</tbody>
+</table>
+<p>Run a task with <code>pixi run -e &lt;environment&gt; &lt;task&gt;</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>main<span class="w">         </span><span class="c1"># the core suite: no pyramids, no GDAL</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>full<span class="w"> </span>test-all<span class="w">    </span><span class="c1"># the whole suite, extras included</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>typecheck<span class="w">    </span><span class="c1"># mypy</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>doctest<span class="w">      </span><span class="c1"># src doctests</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>sample-data<span class="w">  </span><span class="c1"># regenerate the committed LAS/LAZ fixtures</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>full<span class="w"> </span>notebooks<span class="w">   </span><span class="c1"># nbval over docs/examples</span>
+</code></pre></div>
+<p><code>pixi task list -e &lt;environment&gt;</code> shows what is available where. The test and tooling tasks live on the <code>dev</code>
+feature, so they exist in <code>dev</code>, <code>full</code> and the <code>pyXXX</code> environments — not in <code>docs</code>, <code>notebook</code> or <code>default</code>,
+which have no pytest to run them with.</p>
+<h2 id="before-you-push"><a class="toclink" href="#before-you-push">Before you push</a><a class="headerlink" href="#before-you-push" title="Permanent link">#</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>--all-files
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>main
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>pixi<span class="w"> </span>run<span class="w"> </span>-e<span class="w"> </span>dev<span class="w"> </span>typecheck
+</code></pre></div>
+<p>The pre-commit hooks are the same ones CI runs. Two are skipped in CI and should not be skipped locally:
+<code>no-commit-to-branch</code> (it is a local guard, and CI legitimately runs on <code>main</code>) and <code>mypy</code> (CI runs it in the
+<code>static</code> job, inside the <code>dev</code> environment).</p>
+<h2 id="house-rules"><a class="toclink" href="#house-rules">House rules</a><a class="headerlink" href="#house-rules" title="Permanent link">#</a></h2>
+<ul>
+<li>The core stays GDAL-free. Only <code>src/pointclouds/convert.py</code> may import <code>pyramids</code>, inside a function, behind a
+  guarded import that names the <code>[gis]</code> extra. <code>tests/test_core_has_no_gdal.py</code> enforces it — keep it green.</li>
+<li><code>pointclouds</code> owns point clouds; <code>pyramids</code> owns raster and vector (ADR-0001). Work that belongs upstream is
+  reported there rather than reimplemented here.</li>
+<li>Conventional Commits, and a branch per change: <code>&lt;type&gt;/&lt;short-description&gt;</code>.</li>
+</ul>
 
 
 
