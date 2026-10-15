@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -1247,7 +1247,7 @@ which have no pytest to run them with.</p>
 </code></pre></div>
 <p>The pre-commit hooks are the same ones CI runs. Two are skipped in CI and should not be skipped locally:
 <code>no-commit-to-branch</code> (it is a local guard, and CI legitimately runs on <code>main</code>) and <code>mypy</code> (CI runs it in the
-<code>static</code> job, inside the <code>dev</code> environment).</p>
+<code>static</code> job, inside the <code>py314</code> environment, which is the same feature set as <code>dev</code>).</p>
 <h2 id="house-rules"><a class="toclink" href="#house-rules">House rules</a><a class="headerlink" href="#house-rules" title="Permanent link">#</a></h2>
 <ul>
 <li>The core stays GDAL-free. Only <code>src/pointclouds/convert.py</code> may import <code>pyramids</code>, inside a function, behind a
