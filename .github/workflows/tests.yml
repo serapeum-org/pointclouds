@@ -52,10 +52,16 @@ jobs:
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
 
-  # Everything else: the one environment carrying the optional stacks, so the
-  # pyramids converters and the cloud paths run and `pytest -m gis` is not
-  # skipped. One runner is enough - the extras carry their own platform matrix
-  # upstream, and pyramids-gis publishes cp311-cp314 wheels only.
+  # The one environment carrying the optional stacks, and so the only place the
+  # `gis`-marked tests run at all: `tests/test_convert.py` exercises the
+  # `require_pyramids` boundary with pyramids actually installed, which the core
+  # matrix cannot do. Everywhere else those tests are deselected by the `main`
+  # task's `-m "not gis and not cloud"`, or skipped by the module's
+  # `importorskip`. The `to_dataset` / `to_feature_collection` converters land
+  # with T-12 and will be covered here too.
+  #
+  # One runner is enough - the extras carry their own platform matrix upstream,
+  # and pyramids-gis publishes cp311-cp314 wheels only.
   full:
     runs-on: ubuntu-latest
 
