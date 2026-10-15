@@ -229,7 +229,12 @@ docs-serve = { cmd = "mkdocs serve", description = "Serve the docs site with liv
 
 [tool.pixi.environments]
 default = { features = ["py314"], solve-group = "default" }
-dev = { features = ["py314", "dev"], solve-group = "default" }
+# `dev` is the human-facing name for the same feature set as the `py314` matrix
+# leg - identical 177-package resolutions (544 identical lines each in the lock
+# index). They share a solve-group so that set is solved once, and CI installs
+# only the matrix environments: the `static` job runs on `py314`, not `dev`, so
+# the 654 MB environment is not cached twice under two names.
+dev = { features = ["py314", "dev"], solve-group = "py314" }
 docs = { features = ["py314", "docs"], solve-group = "default" }
 notebook = { features = ["py314", "dev", "notebook"], solve-group = "default" }
 # The one environment that carries the optional stacks, and the only place

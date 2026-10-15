@@ -49,7 +49,8 @@ jobs:
 
   # Type check and src doctests. Both need an importable package, so they get a
   # real pixi environment - but neither is platform- or version-sensitive, so
-  # one runner covers them.
+  # one runner covers them. It runs on `py314` rather than the identical `dev`
+  # environment so CI never caches that 654 MB set twice under two names.
   static:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -67,18 +68,18 @@ jobs:
         #   git ls-remote --tags https://github.com/serapeum-org/github-actions
         uses: serapeum-org/github-actions/actions/python-setup/pixi@38c111084f99d5ff5f4a1e63bedce48fe33a10c0  # pixi/v1.2.1
         with:
-          environments: dev
-          activate-environment: dev
+          environments: py314
+          activate-environment: py314
           cache: true
           # Must match the pixi pinned in tests.yml and github-release.yml:
           # pixi.lock is lock-file format v7, which older pixi refuses to read.
           version: v0.73.0
 
       - name: Type check (mypy)
-        run: pixi run -e dev typecheck
+        run: pixi run -e py314 typecheck
 
       - name: Doctests (src)
-        run: pixi run -e dev doctest
+        run: pixi run -e py314 doctest
 
   # The repo's secret gate. gitleaks is the single secret scanner (matching
   # pyramids, pyramids-eo and pyramids-mesh). There is no local gitleaks

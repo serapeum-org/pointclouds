@@ -58,7 +58,7 @@ pixi run -e dev typecheck
 
 The pre-commit hooks are the same ones CI runs. Two are skipped in CI and should not be skipped locally:
 `no-commit-to-branch` (it is a local guard, and CI legitimately runs on `main`) and `mypy` (CI runs it in the
-`static` job, inside the `dev` environment).
+`static` job, inside the `py314` environment, which is the same feature set as `dev`).
 
 ## House rules
 
