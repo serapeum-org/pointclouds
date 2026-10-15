@@ -1,0 +1,38 @@
+# byte-compiled / build
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# environments (kept outside the tree, but guard anyway)
+.venv/
+venv/
+
+# test / coverage
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+coverage-reports/
+htmlcov/
+junit.xml
+
+# docs build
+site/
+
+# notebooks
+.ipynb_checkpoints/
+.jupyter_cache/
+
+# project memory - never commit (see repo CLAUDE.md policy)
+CLAUDE.md
+
+# IDE
+.idea/
+.vscode/
+# pixi environments
+.pixi/*
+!.pixi/config.toml

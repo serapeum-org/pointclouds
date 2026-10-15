@@ -1,0 +1,97 @@
+name: Tests - Suite
+
+permissions:
+  contents: read
+  id-token: write
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # The GDAL-free core: install WITHOUT the [gis]/[cloud] extras and prove the
+  # package reads, filters, decimates and grids with no pyramids and no GDAL.
+  # This is the matrix that matters - the core is pure PyPI wheels, so it is
+  # expected to pass on every OS and every supported interpreter.
+  core:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        # serapeum-org/github-actions is a monorepo: one commit carries the release tag
+        # for every action in it, so 38c11108 is the dereferenced commit for uv/v1.2.1,
+        # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
+        # different actions pinned to one SHA reads like a copy-paste error and is not;
+        # verify with
+        #   git ls-remote --tags https://github.com/serapeum-org/github-actions
+        uses: serapeum-org/github-actions/actions/python-setup/uv@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # uv/v1.2.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          install-groups: "groups: dev"
+          cache: true
+          verify-lock: true
+          # Pin the same uv that writes uv.lock locally, so CI and local stay in
+          # lockstep: the lock carries a revision marker an older uv refuses to
+          # read, and verify-lock above would fail on a rewrite. Bump together.
+          version: "0.12.1"
+
+      - name: Run core tests (no extras)
+        run: |
+          uv run --frozen pytest -vvv -m "not gis and not cloud" --cov=src/pointclouds --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+
+  # Everything else: install the extras so the pyramids converters and the
+  # cloud paths run. One runner is enough - the extras carry their own platform
+  # matrix upstream, and pyramids-gis publishes cp311-cp314 wheels only.
+  full:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: serapeum-org/github-actions/actions/python-setup/uv@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # uv/v1.2.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          install-groups: "groups: dev"
+          cache: true
+          verify-lock: true
+          version: "0.12.1"
+
+      - name: Run full suite (with extras)
+        run: |
+          uv run --frozen --all-extras pytest -vvv --cov=src/pointclouds --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
+
+      - name: Test Jupyter notebooks
+        shell: bash
+        # docs/examples is empty until the first tutorial notebook lands, and
+        # pytest exits 5 (no tests collected) or 4 (usage error: file or
+        # directory not found) in that state. Treat both as success rather than
+        # gating the suite on a directory that is not populated yet.
+        run: |
+          set +e
+          uv run --frozen --all-extras pytest --nbval --nbval-lax --verbose docs/examples
+          rc=$?
+          if [ $rc -eq 4 ] || [ $rc -eq 5 ]; then exit 0; fi
+          exit $rc

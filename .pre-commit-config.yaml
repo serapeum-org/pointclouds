@@ -1,0 +1,47 @@
+fail_fast: true
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-toml
+      - id: check-yaml
+        exclude: '^mkdocs\.yml$'
+      - id: check-json
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: check-added-large-files
+        args: [--maxkb=3000]
+      - id: check-merge-conflict
+      - id: debug-statements
+      - id: detect-private-key
+      - id: no-commit-to-branch
+        args: [--branch=main]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.22
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.7.1
+    hooks:
+      - id: nbstripout
+        files: \.ipynb$
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: "[py - check] mypy"
+        entry: mypy src/pointclouds
+        language: system
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.8.3
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
