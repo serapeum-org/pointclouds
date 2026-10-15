@@ -39,7 +39,15 @@ jobs:
       - name: Run pre-commit hooks
         run: pre-commit run --all-files --show-diff-on-failure --color=always
         env:
-          SKIP: mypy
+          # mypy runs in the static job instead (see above). no-commit-to-branch
+          # is a local commit guard and cannot pass here: on a push event
+          # actions/checkout checks out a real local branch (`-B main`), so the
+          # hook sees `main` and exits 1. It passes on a pull_request event only
+          # because that checks out a detached merge ref, which is why this job
+          # was green on the PR and red on the merge. Skipping it loses nothing -
+          # the guard that matters runs on the developer's machine, before a
+          # commit exists.
+          SKIP: mypy,no-commit-to-branch
 
   # Type check and src doctests. Both need the package importable, so they get a
   # real uv environment - but neither is platform- or version-sensitive, so one
