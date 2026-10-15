@@ -235,7 +235,15 @@ notebook = { features = ["py314", "dev", "notebook"], solve-group = "default" }
 # The one environment that carries the optional stacks, and the only place
 # `pytest -m gis` can pass. Kept on 3.12: pyramids-gis publishes cp311-cp314
 # wheels, and 3.12 is the version its own CI exercises most.
-full = { features = ["py312", "dev", "gis", "cloud"], solve-group = "py312" }
+#
+# Its own solve-group, deliberately not py312's. A shared group forces one
+# consistent resolution across its members, so every version constraint
+# pyramids-gis, fsspec or s3fs carries would also apply to the core py312 leg -
+# the leg whose whole job is to prove the package works with none of them
+# installed. Today the two resolve identically (numpy 2.5.4, scipy 1.18.1,
+# pyproj 3.8.0 in both), so splitting them changes nothing now and keeps a
+# future upstream pin from moving the core matrix behind the scenes.
+full = { features = ["py312", "dev", "gis", "cloud"], solve-group = "full" }
 py311 = { features = ["py311", "dev"], solve-group = "py311" }
 py312 = { features = ["py312", "dev"], solve-group = "py312" }
 py313 = { features = ["py313", "dev"], solve-group = "py313" }
