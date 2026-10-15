@@ -3,13 +3,16 @@
 # attempting a three-way merge on it: a conflict there is never worth resolving
 # by hand - take one side and re-run `pixi lock` against the merged manifest.
 # The linguist hints keep it out of the repo's language statistics and collapse
-# it in GitHub diffs.
-pixi.lock merge=binary linguist-language=YAML linguist-generated=true
+# it in GitHub diffs. `text eol=lf` matters on Windows, where core.autocrlf=true
+# is the norm: without it the lock is checked out with CRLF, pixi rewrites it
+# with LF on the next `pixi lock`, and all 10 805 lines show up as a diff nobody
+# made.
+pixi.lock merge=binary text eol=lf linguist-language=YAML linguist-generated=true
 
 # Notebooks are LF-normalised JSON, which is what the nbstripout pre-commit hook
-# and the CI `notebooks` task produce. Without this pin a Windows checkout
-# rewrites every line, so every notebook under `docs/examples/` shows up as a
-# full-file diff.
+# produces. Nothing here tracks a notebook yet - the rule is in place so the
+# first one under `docs/examples/` arrives correct rather than as a full-file
+# diff on its first Windows checkout.
 *.ipynb text eol=lf
 
 # The committed LAS/LAZ fixtures are binary: never touch their line endings.
