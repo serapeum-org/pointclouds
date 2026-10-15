@@ -149,7 +149,12 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.12"
+# The floor of requires-python, not whatever interpreter the job happens to run.
+# Checking against the oldest supported version is what catches syntax and
+# typing-feature use that 3.11 cannot take; checking against the newest would
+# pass it silently. The `static` job runs on 3.14, and the result is identical
+# either way today - both settings report "no issues found in 13 source files".
+python_version = "3.11"
 ignore_missing_imports = true
 check_untyped_defs = true
 
