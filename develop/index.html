@@ -62,7 +62,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -408,6 +408,24 @@
         
       
       
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
       <a href="." class="md-nav__link md-nav__link--active">
         
   
@@ -424,6 +442,47 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample data
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
       
     </li>
   
@@ -1006,6 +1065,36 @@
     
   
   
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sample-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Sample data
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
 </nav>
                   </div>
                 </div>
@@ -1041,6 +1130,33 @@
 <p>Read, filter, decimate and grid point clouds (LAS / LAZ / COPC) in Python, with an optional bridge to the
 <code>pyramids</code> GIS engine.</p>
 <p>See <a href="installation/">Installation</a> to get started.</p>
+<h2 id="quick-start"><a class="toclink" href="#quick-start">Quick start</a><a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
+<p>Reading is <strong>header-first</strong>: opening a file reads its header and nothing else, so metadata costs the same whether
+the file holds four hundred points or four billion. The record arrays decompress the moment you touch one.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">pointclouds</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pc</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">cloud</span> <span class="o">=</span> <span class="n">pc</span><span class="o">.</span><span class="n">PointCloud</span><span class="o">.</span><span class="n">read_file</span><span class="p">(</span><span class="s2">"examples/data/sample.laz"</span><span class="p">)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">cloud</span><span class="o">.</span><span class="n">crs</span>         <span class="c1"># CRS.from_epsg(28992) - from the header</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">cloud</span><span class="o">.</span><span class="n">bounds</span>      <span class="c1"># (155000.0, 463000.0, 155038.0, 463038.0)</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">cloud</span><span class="o">.</span><span class="n">count</span>       <span class="c1"># 400, straight from the header: no record was read</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="n">cloud</span><span class="o">.</span><span class="n">dimensions</span>  <span class="c1"># ('X', 'Y', 'Z', 'intensity', 'return_number', ...)</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">xyz</span> <span class="o">=</span> <span class="n">cloud</span><span class="o">.</span><span class="n">to_array</span><span class="p">((</span><span class="s2">"X"</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">,</span> <span class="s2">"Z"</span><span class="p">))</span>   <span class="c1"># (400, 3) - this is what loads the records</span>
+</code></pre></div>
+<p>Two things worth knowing:</p>
+<ul>
+<li><code>cloud.count</code> is the header's point count and is free. <code>len(cloud)</code> is how many points are <em>in memory</em>, so on a
+  freshly opened cloud it triggers the read. They agree once the records are loaded.</li>
+<li>Pass <code>lazy=False</code> to <code>read_file</code> to read the records up front, and <code>cloud.loaded</code> tells you which state you are
+  in without changing it.</li>
+</ul>
+<p>Everything above runs on the bare install — numpy, laspy, pyproj and scipy, with no GDAL anywhere. The
+<code>pyramids</code> converters are a separate, optional step behind the <code>[gis]</code> extra.</p>
+<h2 id="sample-data"><a class="toclink" href="#sample-data">Sample data</a><a class="headerlink" href="#sample-data" title="Permanent link">#</a></h2>
+<p><code>examples/data/sample.las</code> and <code>sample.laz</code> are small synthetic fixtures (400 points on a 20 × 20 grid in
+EPSG:28992, with ground and vegetation classes). They are committed, so nothing needs downloading;
+<code>examples/data/make_sample.py</code> regenerates them.</p>
 
 
 
