@@ -23,9 +23,10 @@ Check relevant points.
 - Provide instructions so we can reproduce.
 - Please also list any relevant details for your test configuration
 
-- [ ] `uv run pytest -m "not gis and not cloud"` (the GDAL-free core)
-- [ ] `uv run --all-extras pytest` (full suite, with the `gis` / `cloud` extras)
-- [ ] `uv run --all-extras pytest --nbval --nbval-lax docs/examples` (notebooks)
+- [ ] `pixi run -e dev main` (the GDAL-free core)
+- [ ] `pixi run -e full test-all` (full suite, with the `gis` / `cloud` extras)
+- [ ] `pixi run -e full notebooks` (notebooks)
+- [ ] `pixi run -e dev typecheck` and `pre-commit run --all-files`
 
 # Checklist:
 
