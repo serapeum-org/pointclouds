@@ -11,7 +11,6 @@ import io
 import json
 
 import pytest
-
 from pixi_list_to_requirements import main, to_requirements
 
 
@@ -197,7 +196,8 @@ class TestMain:
         Test scenario:
             Nothing in it is auditable by pip-audit, so passing it on would be the vacuous-pass failure again.
         """
-        monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps([{"name": "python", "version": "3.14", "kind": "conda"}])))
+        inventory = json.dumps([{"name": "python", "version": "3.14", "kind": "conda"}])
+        monkeypatch.setattr("sys.stdin", io.StringIO(inventory))
 
         code = main()
 

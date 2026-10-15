@@ -25,21 +25,49 @@ _EXCLUDED = {"pointclouds"}
 
 
 def to_requirements(packages: Iterable[dict]) -> list[str]:
-    """Convert pixi's package records into sorted ``name==version`` lines.
+    """Convert pixi's package records into sorted `name==version` lines.
+
+    Three records are dropped: anything whose `kind` is not `pypi` (a conda build is not a PyPI project, so
+    pip-audit cannot resolve it), anything without a version, and this package itself. What survives is a fully
+    pinned set, which is what lets the audit run with `--no-deps`.
 
     Args:
-        packages: the decoded `pixi list --json` array.
+        packages: the decoded `pixi list --json` array. Each record is a mapping with at least `name`, and
+            normally `version` and `kind`; missing keys are treated as "not auditable" rather than as an error.
 
     Returns:
-        Sorted `name==version` strings, one per PyPI package that carries a version.
+        Sorted `name==version` strings, one per PyPI package that carries a version. Empty when nothing in the
+        inventory qualifies.
 
     Examples:
-        >>> to_requirements([
-        ...     {"name": "numpy", "version": "2.5.4", "kind": "pypi"},
-        ...     {"name": "python", "version": "3.14.8", "kind": "conda"},
-        ...     {"name": "pointclouds", "kind": "pypi"},
-        ... ])
-        ['numpy==2.5.4']
+        - A mixed inventory keeps only the versioned PyPI packages:
+            ```python
+            >>> lines = to_requirements([
+            ...     {"name": "scipy", "version": "1.18.1", "kind": "pypi"},
+            ...     {"name": "numpy", "version": "2.5.4", "kind": "pypi"},
+            ...     {"name": "python", "version": "3.14.8", "kind": "conda"},
+            ... ])
+            >>> lines
+            ['numpy==2.5.4', 'scipy==1.18.1']
+            >>> len(lines)
+            2
+
+            ```
+        - The editable self-install carries no version, so it never reaches the audit:
+            ```python
+            >>> to_requirements([{"name": "pointclouds", "kind": "pypi"}])
+            []
+
+            ```
+        - A differently named project is kept, because `point-clouds` is not this distribution:
+            ```python
+            >>> to_requirements([{"name": "point_clouds", "version": "9.9.9", "kind": "pypi"}])
+            ['point_clouds==9.9.9']
+
+            ```
+
+    See Also:
+        main: the stdin-to-stdout wrapper the CI step actually calls.
     """
     return sorted(
         f"{package['name']}=={package['version']}"
@@ -53,9 +81,41 @@ def to_requirements(packages: Iterable[dict]) -> list[str]:
 def main() -> int:
     """Read `pixi list --json` on stdin and write requirements lines to stdout.
 
+    This is what `.github/workflows/pip-audit.yml` runs. The non-zero exit on an empty result is the point: an
+    empty requirements file makes pip-audit report success, so a mis-piped command or an environment whose
+    packages are all conda would otherwise look like a clean advisory scan.
+
     Returns:
-        ``0`` on success, ``1`` when the environment yielded no PyPI package at all - which means the inventory
-        was empty or the wrong thing was piped in, and auditing it would pass vacuously.
+        `0` after writing at least one pin to stdout, `1` when nothing in the inventory was auditable. The
+        explanation for a `1` goes to stderr, so stdout stays safe to redirect into a requirements file.
+
+    Raises:
+        json.JSONDecodeError: when stdin does not hold valid JSON - a broken pipe or an error message arriving
+            in place of the inventory fails the step rather than producing an empty audit.
+
+    Examples:
+        - A populated inventory is written to stdout, one pin per line, and exits 0:
+            ```python
+            >>> import io, sys
+            >>> saved, sys.stdin = sys.stdin, io.StringIO('[{"name": "numpy", "version": "2.5.4", "kind": "pypi"}]')
+            >>> main()
+            numpy==2.5.4
+            0
+            >>> sys.stdin = saved
+
+            ```
+        - An inventory with nothing auditable exits 1 and writes nothing to stdout:
+            ```python
+            >>> import io, sys
+            >>> saved, sys.stdin = sys.stdin, io.StringIO('[{"name": "python", "version": "3.14", "kind": "conda"}]')
+            >>> main()
+            1
+            >>> sys.stdin = saved
+
+            ```
+
+    See Also:
+        to_requirements: the filtering rules, which this only wraps in I/O and an exit code.
     """
     lines = to_requirements(json.load(sys.stdin))
     if not lines:
