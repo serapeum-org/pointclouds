@@ -20,12 +20,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The floor and the ceiling of requires-python. Each pixi environment is
-        # one concrete resolution, so py311 pins the oldest dependency set the
-        # project supports - the one most likely to carry a known advisory - and
-        # py314 the newest. Auditing one alone would leave the other's versions
-        # unchecked.
-        environment: [py311, py314]
+        # Four environments, because each pixi environment is one concrete
+        # resolution and an unaudited environment is an unaudited dependency:
+        #   py311 / py314 - the two ends of the interpreter range, which resolve
+        #                   different versions of numpy, scipy and pyproj.
+        #   full          - the only environment carrying the `gis` and `cloud`
+        #                   features, so pyramids-gis, fsspec and s3fs are
+        #                   audited at all.
+        #   docs          - mkdocs-material and the mkdocstrings stack, ~80
+        #                   packages that no other environment installs.
+        # Together these cover every runtime dependency, extra and dependency
+        # group the project declares.
+        environment: [py311, py314, full, docs]
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,14 +54,25 @@ jobs:
           # pixi.lock is lock-file format v7, which older pixi refuses to read.
           version: v0.73.0
 
-      # `pip freeze` of an installed environment lists exactly one version per
-      # package, so the requirements file never conflicts with itself.
-      # `--exclude-editable` drops this package itself (it has no release to
-      # audit); the grep keeps only `name==version` lines, since pip-audit
-      # rejects a requirements file holding direct URLs or local paths.
+      # The inventory comes from `pixi list`, not `pip freeze`: `pip` is only in
+      # the `dev` dependency group, so a `python -m pip freeze` in the `docs`
+      # environment prints nothing and the job would audit an empty file and
+      # pass. `pixi list` needs nothing installed inside the environment and is
+      # the manager's own record of what it put there.
+      #
+      # Only `kind == "pypi"` entries are kept: pip-audit resolves names against
+      # PyPI, and the conda packages in a pixi environment (python, openssl,
+      # libzlib, ...) are not PyPI projects. Each line is already pinned to one
+      # version, so the file can never conflict with itself.
+      #
+      # `--no-deps` is what makes the audit independent of whichever interpreter
+      # pipx picks: the file is fully pinned, so pip-audit looks each package up
+      # in the advisory DB instead of resolving and installing the set in a
+      # throwaway venv under the runner's default Python. Without it the job
+      # fails on a resolution conflict rather than reporting advisories.
       - name: Audit dependencies with pip-audit
         run: |
-          pixi run -e ${{ matrix.environment }} python -m pip freeze --exclude-editable \
-            | grep -E '^[A-Za-z0-9_.-]+==' > "${RUNNER_TEMP}/pip-audit-reqs.txt"
-          echo "Auditing $(wc -l < "${RUNNER_TEMP}/pip-audit-reqs.txt") pinned packages against the advisory DB"
-          pipx run pip-audit --requirement "${RUNNER_TEMP}/pip-audit-reqs.txt" --desc
+          pixi list -e ${{ matrix.environment }} --json \
+            | python ci/pixi_list_to_requirements.py > "${RUNNER_TEMP}/pip-audit-reqs.txt"
+          echo "Auditing $(wc -l < "${RUNNER_TEMP}/pip-audit-reqs.txt") pinned packages from the ${{ matrix.environment }} environment"
+          pipx run pip-audit --requirement "${RUNNER_TEMP}/pip-audit-reqs.txt" --no-deps --desc
