@@ -78,9 +78,10 @@ dev = [
     "mypy >=1.10.0",
     "types-PyYAML >=6.0.0",
     # Pinned, not floored: this is the same version the `.pre-commit-config.yaml`
-    # hook pins, so `uv run ruff check` locally, the hook, and the lint workflow
-    # all enforce one rule set. Keep the two revs in step. ruff covers what the
-    # pixi repos in this org split across black, flake8 and pydocstyle.
+    # hook pins, so the hook, a local `pixi run -e dev ruff check`, and the lint
+    # workflow all enforce one rule set. Keep the two revs in step. ruff covers
+    # what the other pixi repos in this org split across black, flake8 and
+    # pydocstyle.
     "ruff ==0.15.22",
 ]
 docs = [
@@ -149,7 +150,12 @@ markers = [
 ]
 
 [tool.mypy]
-python_version = "3.12"
+# The floor of requires-python, not whatever interpreter the job happens to run.
+# Checking against the oldest supported version is what catches syntax and
+# typing-feature use that 3.11 cannot take; checking against the newest would
+# pass it silently. The `static` job runs on 3.14, and the result is identical
+# either way today - both settings report "no issues found in 13 source files".
+python_version = "3.11"
 ignore_missing_imports = true
 check_untyped_defs = true
 
@@ -173,18 +179,133 @@ convention = "google"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["win-64"]
+# The macOS baseline is raised on osx-arm64 so pixi picks the pre-built wheels
+# instead of falling back to sdists. pyproj publishes only `macosx_14_0_arm64`
+# for arm64, above the pixi default, so without this it has no wheel to take and
+# builds from source - which needs PROJ headers the runner does not have. numpy
+# and scipy also ship a `macosx_14_0_arm64` build and quietly drop to an older,
+# lower-baseline wheel without it. macos-latest runners are >= 14.
+#
+# Declared here rather than in a `[tool.pixi.system-requirements]` table, which
+# pixi 0.73 warns about on every parse:
+#
+#   WARN Encountered 1 warning while parsing the manifest:
+#     the `[system-requirements]` table is deprecated in favor of virtual
+#     packages
+#
+# The inline form has one visible consequence: a platform carrying a raised
+# baseline is written to pixi.lock under a generated alias rather than its own
+# name, so the osx-arm64 entry reads
+#
+#   - name: p1
+#     subdir: osx-arm64
+#     virtual-packages: [__osx=14.0, __unix=0=0, __archspec=0=m1]
+#
+# and the environment blocks key off `p1:`. That is pixi's own encoding, but it
+# is not yet confirmed that the macOS runners resolve it: those legs have been
+# queued, never completed, on every push to this branch so far. If they fail to
+# match a runner, this is the line to look at first.
+platforms = ["win-64", "linux-64", { platform = "osx-arm64", macos = "14.0" }]
 
+# The editable self-install below is the only entry, and there is no
+# [tool.pixi.dependencies] table beyond the interpreter pins at the bottom of
+# this file: every environment is built from the standard declarations - runtime
+# deps from [project.dependencies], tooling from the `dev` / `docs` dependency
+# groups, the optional stacks from [project.optional-dependencies] - all
+# resolved from PyPI. pixi turns each extra and each dependency group into a
+# feature of the same name, which is what the environments below compose; the
+# `all` extra has no feature of its own in use, since it only exists so pip
+# users can write `pip install pointclouds[all]`.
+#
+# In particular there is no conda `gdal`, and there must never be one. The core
+# is GDAL-free by design (ADR-0001); the `gis` feature's pyramids-gis wheel
+# vendors its own osgeo and `import pyramids` prepends that directory to
+# `sys.path`, so a conda GDAL would be installed and never imported.
 [tool.pixi.pypi-dependencies]
 pointclouds = { path = ".", editable = true }
 
-[tool.pixi.environments]
-default = { solve-group = "default" }
-all = { features = ["all"], solve-group = "default" }
-cloud = { features = ["cloud"], solve-group = "default" }
-dev = { features = ["dev"], solve-group = "default" }
-docs = { features = ["docs"], solve-group = "default" }
-gis = { features = ["gis"], solve-group = "default" }
-notebook = { features = ["notebook"], solve-group = "default" }
+# Tasks live on the features that can actually run them, never on the default
+# feature. A task declared there exists in every environment, including `docs`,
+# `notebook` and `default`, which carry no pytest - and pixi does not fail in
+# that state, it runs whatever `pytest` is first on PATH:
+#
+#   $ pixi run -e docs main
+#   E   ModuleNotFoundError: No module named 'laspy'
+#   $ pixi run -e docs python -c "import shutil; print(shutil.which('pytest'))"
+#   C:\miniforge\envs\py312\Scripts\pytest.EXE     <- an unrelated environment
+#
+[tool.pixi.feature.dev.tasks]
+# `main` is the core suite: the GDAL-free install, with the extras deselected by
+# marker. It runs in every pyXXX environment, none of which carries `gis` or
+# `cloud`, so an accidental import of pyramids fails the run rather than passing
+# quietly on a machine that happens to have it.
+main = { cmd = "pytest -vvv --cov=src/pointclouds -m 'not gis and not cloud' --cov-report=xml --junitxml=junit.xml -o junit_family=legacy", description = "Run the core test suite (no extras)" }
+test-all = { cmd = "pytest -vvv --cov=src/pointclouds --cov-report=xml --cov-report=term-missing", description = "Run the whole test suite (use -e full, or the gis/cloud tests skip)" }
+notebooks = { cmd = "pytest --nbval --nbval-lax --verbose docs/examples", description = "check notebooks" }
+# The uv workflow tolerated pytest's exit 5 here, because src carried no
+# doctest at all. One exists now (`PointCloud`), so the task is a real check and
+# the tolerance is gone - if every doctest is ever deleted this task starts
+# failing with "no tests collected", which is the correct outcome.
+doctest = { cmd = "pytest --doctest-modules src/pointclouds -p no:cacheprovider", description = "Run the src doctests" }
+typecheck = { cmd = "mypy src/pointclouds", description = "Type check the package" }
+sample-data = { cmd = "python examples/data/make_sample.py", description = "Regenerate the committed LAS/LAZ fixtures" }
+build-dist = { cmd = "python -m build", description = "Build sdist and wheel for PyPI" }
+publish-pypi = { cmd = "twine upload --non-interactive --repository pypi dist/*", depends-on = ["build-dist"], description = "Build and upload package to PyPI" }
+cz-changelog = { cmd = "cz changelog", description = "Generate the changelog with commitizen" }
+cz-bump = { cmd = "cz bump", description = "Bump the version with commitizen" }
 
-[tool.pixi.tasks]
+[tool.pixi.feature.docs.tasks]
+docs-build = { cmd = "mkdocs build --strict", description = "Build the docs site, failing on any warning" }
+docs-serve = { cmd = "mkdocs serve", description = "Serve the docs site with live reload" }
+
+[tool.pixi.environments]
+default = { features = ["py314"], solve-group = "default" }
+# `dev` is the human-facing name for the same feature set as the `py314` matrix
+# leg - identical 177-package resolutions (544 identical lines each in the lock
+# index). They share a solve-group so that set is solved once, and CI installs
+# only the matrix environments: the `static` job runs on `py314`, not `dev`, so
+# the 654 MB environment is not cached twice under two names.
+dev = { features = ["py314", "dev"], solve-group = "py314" }
+docs = { features = ["py314", "docs"], solve-group = "default" }
+notebook = { features = ["py314", "dev", "notebook"], solve-group = "default" }
+# The one environment that carries the optional stacks, and the only place
+# `pytest -m gis` can pass. Kept on 3.12: pyramids-gis publishes cp311-cp314
+# wheels, and 3.12 is the version its own CI exercises most.
+#
+# Its own solve-group, deliberately not py312's. A shared group forces one
+# consistent resolution across its members, so every version constraint
+# pyramids-gis, fsspec or s3fs carries would also apply to the core py312 leg -
+# the leg whose whole job is to prove the package works with none of them
+# installed. Today the two resolve identically (numpy 2.5.4, scipy 1.18.1,
+# pyproj 3.8.0 in both), so splitting them changes nothing now and keeps a
+# future upstream pin from moving the core matrix behind the scenes.
+full = { features = ["py312", "dev", "gis", "cloud"], solve-group = "full" }
+py311 = { features = ["py311", "dev"], solve-group = "py311" }
+py312 = { features = ["py312", "dev"], solve-group = "py312" }
+py313 = { features = ["py313", "dev"], solve-group = "py313" }
+py314 = { features = ["py314", "dev"], solve-group = "py314" }
+
+# Interpreter pins, one feature per environment in the matrix. `default`, `dev`,
+# `docs` and `notebook` reuse `py314` rather than declaring a second 3.14 pin of
+# their own. Nothing else constrains them - without a pin their only bound is
+# `requires-python = ">= 3.11, <4"`, so they would float to whatever conda-forge
+# ships newest, and a release the dependencies have no wheels for yet would be
+# resolved from sdists.
+#
+# 3.13 and 3.14 additionally carry a build glob to exclude the free-threaded
+# interpreter, whose conda build string ends `_cp313t` / `_cp314t` - the glob
+# anchors on the plain suffix, so it matches one and not the other. laspy's
+# lazrs backend and scipy ship no free-threaded wheels, and nothing absorbs
+# that: `pixi lock` and `pixi install` both still succeed in that state, so the
+# failure lands at import rather than at resolve time.
+#
+# 3.11 and 3.12 need no glob - free-threading starts at 3.13, so conda-forge
+# publishes no `t` variant to exclude.
+[tool.pixi.feature.py311.dependencies]
+python = "3.11.*"
+[tool.pixi.feature.py312.dependencies]
+python = "3.12.*"
+[tool.pixi.feature.py313.dependencies]
+python = { version = "3.13.*", build = "*_cp313" }
+[tool.pixi.feature.py314.dependencies]
+python = { version = "3.14.*", build = "*_cp314" }

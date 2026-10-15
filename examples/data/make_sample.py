@@ -7,7 +7,7 @@ return number, with a sloping surface in z and a handful of points raised to sta
 They are committed so the test suite and the docs examples need no download and no vendor data. Run this script
 only to change what they contain::
 
-    uv run python examples/data/make_sample.py
+    pixi run -e dev sample-data
 
 Keep it deterministic: the tests assert on exact counts and bounds.
 """

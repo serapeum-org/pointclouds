@@ -45,6 +45,30 @@ def test_to_array_core_path(tiny_cloud):
     assert xyz.shape == (4, 3)
 
 
+def test_require_pyramids_hint_is_raised_when_the_import_fails(monkeypatch):
+    """The hint path raises `ModuleNotFoundError` naming the extra, whether or not pyramids is installed.
+
+    The test below only exercises this when pyramids is genuinely absent, so it skips in the `full`
+    environment - the one environment where a regression in the guarded import would matter least to spot
+    late. Blocking the import directly makes the contract hold in every environment.
+    """
+    from pointclouds import convert
+
+    real_import = builtins.__import__
+
+    def blocked(name, *args, **kwargs):
+        if name.startswith("pyramids"):
+            raise ModuleNotFoundError(f"No module named {name!r}")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocked)
+
+    with pytest.raises(ModuleNotFoundError, match=r"pointclouds\[gis\]") as excinfo:
+        convert.require_pyramids()
+
+    assert excinfo.value.__cause__ is not None, "the original ImportError should be chained as __cause__"
+
+
 def test_require_pyramids_hint_without_extra():
     """`require_pyramids` names the [gis] extra when pyramids is absent (core path)."""
     from pointclouds import convert

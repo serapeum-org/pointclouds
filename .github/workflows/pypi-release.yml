@@ -38,7 +38,7 @@ jobs:
 
       - name: Build and publish to PyPI
         # serapeum-org/github-actions is a monorepo: one commit carries the release tag
-        # for every action in it, so 38c11108 is the dereferenced commit for uv/v1.2.1,
+        # for every action in it, so 38c11108 is the dereferenced commit for pixi/v1.2.1,
         # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
         # different actions pinned to one SHA reads like a copy-paste error and is not;
         # verify with
@@ -47,10 +47,9 @@ jobs:
         with:
           pypi-username: __token__
           pypi-password: ${{ secrets.PYPI_PUBLISH }}
-          python-version: '3.12'
-          package-manager: 'uv'
-          package-manager-version: '0.12.1'
-          install-groups: 'groups: dev'
+          package-manager: 'pixi'
+          package-manager-version: 'v0.73.0'
+          install-groups: 'dev'
           # The version bump that precedes this run rewrites pyproject.toml, so
           # the lock is one commit behind by design here.
           verify-lock: 'false'

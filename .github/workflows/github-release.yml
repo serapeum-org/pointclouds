@@ -60,7 +60,7 @@ jobs:
 
       - name: Create GitHub Release with Commitizen
         # serapeum-org/github-actions is a monorepo: one commit carries the release tag
-        # for every action in it, so 38c11108 is the dereferenced commit for uv/v1.2.1,
+        # for every action in it, so 38c11108 is the dereferenced commit for pixi/v1.2.1,
         # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
         # different actions pinned to one SHA reads like a copy-paste error and is not;
         # verify with
@@ -71,22 +71,27 @@ jobs:
           increment: ${{ github.event.inputs.increment }}
           prerelease-type: ${{ github.event.inputs.prerelease_type }}
           draft: ${{ github.event.inputs.draft }}
-          package-manager: uv
-          python-version: "3.12"
-          # Must match the uv pinned in tests.yml: this job runs `uv lock` and
-          # commits the result, so a floating version could write a lock
-          # revision the test matrix cannot read.
-          package-manager-version: "0.12.1"
-          install-groups: "groups: dev"
+          package-manager: pixi
+          # Must match the pixi pinned in tests.yml and lint.yml: this job
+          # installs from pixi.lock, which is format v7 and unreadable to older
+          # pixi.
+          package-manager-version: v0.73.0
+          install-groups: "dev"
 
-      - name: Update lockfile after version bump
-        run: uv lock
-
-      - name: Commit and push updated lockfile
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add uv.lock
-          git diff --cached --quiet && echo "No lockfile changes" && exit 0
-          git commit -m "build: sync uv.lock after version bump"
-          git push origin ${{ inputs.release-branch }}
+      # There is deliberately no `pixi lock` + commit step here, unlike the uv
+      # setup this replaced. uv.lock recorded the project's own version, so a
+      # `cz bump` genuinely invalidated it; pixi.lock does not record it:
+      #
+      #   $ grep -A2 '^- pypi: \./' pixi.lock
+      #   - pypi: ./
+      #     name: pointclouds
+      #     requires_dist:            <- no `version:` field
+      #   $ sed -i 's/^version = "0.1.0"/version = "0.2.0"/' pyproject.toml
+      #   $ pixi lock --check
+      #   Lock-file was already up-to-date
+      #
+      # So a `pixi lock` after the bump can never be committing the bump. It can
+      # only commit an unrelated re-solve caused by upstream channel churn -
+      # pushed straight to the release branch, unreviewed, by a bot, moments
+      # after the tag. The lock is kept fresh by the normal PR flow instead,
+      # where every job runs with `verify-lock` and fails on drift.
