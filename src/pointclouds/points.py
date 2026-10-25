@@ -453,12 +453,8 @@ class PointCloud:
             being indexed, so the empty-means-absent convention is preserved.
         """
         self.load()
-        attributes = {
-            name: values[selector] if values.size else values for name, values in self._attributes.items()
-        }
-        return PointCloud(
-            x=self._x[selector], y=self._y[selector], z=self._z[selector], crs=self._crs, **attributes
-        )
+        attributes = {name: values[selector] if values.size else values for name, values in self._attributes.items()}
+        return PointCloud(x=self._x[selector], y=self._y[selector], z=self._z[selector], crs=self._crs, **attributes)
 
     def to_crs(
         self,

@@ -94,9 +94,7 @@ def build_mask(
     n = cloud.x.shape[0]  # also forces a lazy cloud to load, so every array below is populated
     mask = np.ones(n, dtype=bool)
 
-    for name, criterion in zip(
-        _ATTRIBUTE_CRITERIA, (intensity, classification, return_number), strict=True
-    ):
+    for name, criterion in zip(_ATTRIBUTE_CRITERIA, (intensity, classification, return_number), strict=True):
         if criterion is None:
             continue
         values = getattr(cloud, name)

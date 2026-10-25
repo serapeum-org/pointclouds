@@ -166,9 +166,7 @@ def _radius_contributions(x, y, z, xmin, ymax, cell_size, ncols, nrows, radius):
 def _reducer(aggregate: str):
     """Return the reducer for an aggregate name, or raise when the name is not recognised."""
     if aggregate in _SIMPLE:
-        return lambda cell, values, distance, ncells, nodata: _reduce_simple(
-            aggregate, cell, values, ncells, nodata
-        )
+        return lambda cell, values, distance, ncells, nodata: _reduce_simple(aggregate, cell, values, ncells, nodata)
     if aggregate == "idw":
         return _reduce_idw
     match = _PERCENTILE.match(aggregate)
@@ -180,8 +178,7 @@ def _reducer(aggregate: str):
             percentile, cell, values, ncells, nodata
         )
     raise ValueError(
-        f"unknown aggregate {aggregate!r}; expected one of "
-        "min, max, mean, count, stdev, idw, or a percentile like p95"
+        f"unknown aggregate {aggregate!r}; expected one of min, max, mean, count, stdev, idw, or a percentile like p95"
     )
 
 

@@ -362,9 +362,7 @@ class TestToGrid:
 
     def test_idw_weights_the_nearer_point_more(self):
         """With one point near a cell centre and one far, idw leans to the near value."""
-        cloud = PointCloud(
-            x=np.array([0.5, 0.9]), y=np.array([0.5, 0.5]), z=np.array([0.0, 100.0])
-        )
+        cloud = PointCloud(x=np.array([0.5, 0.9]), y=np.array([0.5, 0.5]), z=np.array([0.0, 100.0]))
         array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="idw", bounds=(0.0, 0.0, 1.0, 1.0))
 
         # The point at (0.5, 0.5) sits on the centre, so its zero dominates the weighting.

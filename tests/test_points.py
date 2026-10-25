@@ -34,7 +34,9 @@ class TestConstruction:
         """An attribute array is either empty (absent) or one value per point; any other length is refused."""
         with pytest.raises(ValueError, match="classification has length 4, expected 0 or 3"):
             PointCloud(
-                x=np.zeros(3), y=np.zeros(3), z=np.zeros(3),
+                x=np.zeros(3),
+                y=np.zeros(3),
+                z=np.zeros(3),
                 classification=np.array([2, 5, 6, 7], dtype=np.uint8),
             )
 
