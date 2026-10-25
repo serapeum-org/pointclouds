@@ -10,6 +10,9 @@ Decision - the default window is ``mode="bin"`` (the §6/§9 open question, sett
     ever uses bin mode. The choice is made explicit in the signature rather than implied: pass ``mode="radius"``
     for PDAL's behaviour, where every point within ``radius`` of a cell centre contributes.
 
+Cost: bin mode is a single vectorised pass over the points. Radius mode issues one KD-tree ball query per cell,
+so its cost grows with the number of cells - prefer bin mode for a large grid unless the radius window is needed.
+
 The result is ``(array, transform, crs)``: a plain NumPy array, a GDAL-style affine 6-tuple
 ``(x_origin, cell_size, 0, y_origin, 0, -cell_size)``, and the cloud's :class:`pyproj.CRS` (or ``None``) - never a
 GDAL object. Turning that into a pyramids ``Dataset`` is the separate ``[gis]`` step in
