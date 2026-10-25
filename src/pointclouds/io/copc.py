@@ -18,8 +18,10 @@ Two entry points, mirroring :mod:`pointclouds.io.las`:
 both are already core dependencies, so nothing here needs an extra. Everything imports with the core set
 (numpy, laspy, pyproj) and never touches GDAL.
 
-A COPC source may be a local path or any file-like object, which is how a remote cloud is read without this
-package taking on an HTTP client: open the object with ``fsspec`` (the ``[cloud]`` extra) and pass it in.
+A COPC source may be a local path or a file object exposing ``read`` / ``seek`` / ``tell`` (the
+:class:`FileObject` protocol), which is how a remote cloud is read without this package taking on an HTTP
+client: open the object with ``fsspec`` (the ``[cloud]`` extra) and pass it in. The handle must be seekable -
+COPC is a random-access format - and it stays the caller's to close.
 
 **EPT is not implemented here yet.** An Entwine tileset is a directory of files behind an ``ept.json`` rather
 than a single indexed file, and ``laspy`` has no reader for it, so it needs its own traversal and fetch path -
@@ -35,6 +37,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import laspy
 import numpy as np
@@ -44,14 +47,43 @@ from laspy.errors import LaspyException, LazError
 from pointclouds.io import _records
 from pointclouds.io.las import LasHeaderInfo
 
-__all__ = ["CopcHeaderInfo", "is_copc", "read_header", "read_window"]
+__all__ = ["CopcHeaderInfo", "FileObject", "Source", "is_copc", "read_header", "read_window"]
 
 #: A COPC file is LAZ-compressed by definition (the octree is a chunk layout, and chunks only exist in LAZ), so
 #: an uncompressed ``.las`` can never be one.
 _SUFFIXES = {".laz"}
 
+
+@runtime_checkable
+class FileObject(Protocol):
+    """The file-object contract a COPC source may satisfy: ``read`` / ``seek`` / ``tell``.
+
+    Deliberately structural rather than ``io.IOBase``: laspy's own remote reader (``HttpRangeStream``) and an
+    ``fsspec`` handle are not ``io.IOBase`` subclasses, so an ``isinstance(io.IOBase)`` test would reject
+    exactly the remote sources this package exists to support. These three methods are what ``laspy.CopcReader``
+    documents as sufficient.
+    """
+
+    def read(self, size: int = ..., /) -> bytes: ...
+    def seek(self, offset: int, whence: int = ..., /) -> int: ...
+    def tell(self) -> int: ...
+
+
 #: What a source may be: a path, or an already-open file object (an ``fsspec`` handle, a ``BytesIO``, ...).
-Source = str | os.PathLike[str] | io.IOBase
+Source = str | os.PathLike[str] | FileObject
+
+
+def _is_file_object(source: Source) -> bool:
+    """Whether ``source`` is a file object (has ``read``/``seek``/``tell``) rather than a path.
+
+    Args:
+        source: the value to classify.
+
+    Returns:
+        ``True`` for a read/seek/tell object, ``False`` for a path-like. A ``str`` / ``Path`` has none of the
+        three, so it never matches.
+    """
+    return all(callable(getattr(source, name, None)) for name in ("read", "seek", "tell"))
 
 
 @dataclass(frozen=True)
@@ -92,7 +124,7 @@ class CopcHeaderInfo(LasHeaderInfo):
     spacing: float
 
 
-def _resolve(source: Source) -> Source:
+def _resolve(source: Source) -> Path | FileObject:
     """Validate ``source`` if it is a path, and pass a file object through untouched.
 
     Args:
@@ -104,9 +136,14 @@ def _resolve(source: Source) -> Source:
     Raises:
         FileNotFoundError: when a path does not exist, naming the path rather than surfacing laspy's error.
         ValueError: when a path's suffix is not ``.laz``.
+        TypeError: when ``source`` is neither a path nor a read/seek/tell file object.
     """
-    if isinstance(source, io.IOBase):
+    if not isinstance(source, (str, os.PathLike)) and _is_file_object(source):
         return source
+    if not isinstance(source, (str, os.PathLike)):
+        raise TypeError(
+            f"source must be a path or a file object with read/seek/tell; got {type(source).__name__}"
+        )
     resolved = Path(source)
     if resolved.suffix.lower() not in _SUFFIXES:
         raise ValueError(
@@ -137,19 +174,29 @@ def _reader(source: Source) -> Iterator[laspy.CopcReader]:
             read the "no octree" message points at would fail for the same reason.
         laspy.errors.LaspyException: for any other structural read failure (a truncated or corrupt file). Also
             re-raised unchanged, for the same reason.
+        ValueError: when the source is a non-seekable file object - COPC needs random access.
     """
     resolved = _resolve(source)
-    if isinstance(resolved, io.IOBase):
-        # Rewind: laspy reads the header from wherever the handle happens to sit, so a second read of the same
-        # handle - a header read followed by a window read - would otherwise start mid-file.
-        resolved.seek(0)
     try:
-        if isinstance(resolved, io.IOBase):
+        if isinstance(resolved, Path):
+            reader = laspy.CopcReader.open(resolved)
+        else:
+            # COPC is random-access: laspy seeks all over the file. A non-seekable handle (an uncached remote
+            # stream) cannot serve a window - say so rather than let seek() raise an opaque
+            # UnsupportedOperation. seekable() is optional on the FileObject protocol (laspy's own
+            # HttpRangeStream lacks it), so a missing one is taken as "seekable".
+            seekable = getattr(resolved, "seekable", None)
+            if seekable is not None and not seekable():
+                raise ValueError(
+                    "a COPC window needs a seekable file object (laspy seeks across the octree); open the "
+                    "handle with caching enabled, or pass a path"
+                )
+            # Rewind: laspy reads the header from wherever the handle happens to sit, so a second read of the
+            # same handle - a header read followed by a window read - would otherwise start mid-file.
+            resolved.seek(0)
             # close_fd=False: the caller opened this handle, so the caller closes it. laspy's own default would
             # close it on exit, which would break a caller reading several windows out of one fsspec handle.
             reader = laspy.CopcReader(resolved, close_fd=False)
-        else:
-            reader = laspy.CopcReader.open(resolved)
     except LazError:
         # A missing lazrs backend is not "no octree" - the file is COPC, the environment just cannot read LAZ.
         raise

@@ -540,3 +540,56 @@ class TestErrorTranslation:
         """The one case the translation is for: a valid LAZ with no octree keeps its helpful message."""
         with pytest.raises(ValueError, match="carries no COPC octree"):
             copc.read_window(sample_laz, bbox=CORNER_BBOX)
+
+
+class _DuckFile:
+    """A read/seek/tell object that is NOT an io.IOBase - exactly laspy's own HttpRangeStream shape."""
+
+    def __init__(self, data: bytes) -> None:
+        self._buf = io.BytesIO(data)
+
+    def read(self, size: int = -1) -> bytes:
+        return self._buf.read(size)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self._buf.seek(offset, whence)
+
+    def tell(self) -> int:
+        return self._buf.tell()
+
+
+class _NonSeekable(io.RawIOBase):
+    """A readable but non-seekable stream, like an uncached remote handle."""
+
+    def __init__(self, data: bytes) -> None:
+        self._data = data
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return False
+
+
+class TestSourceHandling:
+    """Which objects count as a source, and what an unusable one says (M2, M3)."""
+
+    def test_a_duck_typed_handle_is_accepted(self, sample_copc):
+        """A read/seek/tell object works even though it is not an io.IOBase - laspy's own remote stream is one."""
+        duck = _DuckFile(sample_copc.read_bytes())
+
+        arrays = copc.read_window(duck, bbox=CORNER_BBOX)
+
+        assert arrays["x"].size == CORNER_COUNT
+
+    def test_a_non_source_raises_a_clear_type_error(self, sample_copc):
+        """An object that is neither a path nor a file handle is named for what it is, not an fspath error."""
+        with pytest.raises(TypeError, match="path or a file object"):
+            copc.read_window(12345)
+
+    def test_a_non_seekable_handle_is_refused_with_a_clear_message(self, sample_copc):
+        """COPC needs random access; a non-seekable handle is told so, not left to raise UnsupportedOperation."""
+        stream = _NonSeekable(sample_copc.read_bytes())
+
+        with pytest.raises(ValueError, match="seekable"):
+            copc.read_window(stream, bbox=CORNER_BBOX)
