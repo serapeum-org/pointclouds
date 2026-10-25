@@ -84,7 +84,8 @@ class PointCloud:
             crs: anything :class:`pyproj.CRS` accepts, or ``None``.
 
         Raises:
-            ValueError: if ``x``, ``y`` and ``z`` do not all share one length.
+            ValueError: if ``x``, ``y`` and ``z`` do not all share one length, or if an attribute array is
+                neither empty (absent) nor exactly one value per point.
         """
         self._x = np.asarray(x, dtype=np.float64)
         self._y = np.asarray(y, dtype=np.float64)
@@ -102,6 +103,9 @@ class PointCloud:
         n = len(self._x)
         if not (len(self._y) == n and len(self._z) == n):
             raise ValueError(f"x/y/z must share a length; got {len(self._x)}, {len(self._y)}, {len(self._z)}")
+        for name, values in self._attributes.items():
+            if values.size and values.size != n:
+                raise ValueError(f"{name} has length {values.size}, expected 0 or {n}")
 
     @classmethod
     def read_file(cls, path: str | Path, *, lazy: bool = True) -> PointCloud:
