@@ -29,6 +29,7 @@ the second half of the issue this module closes the first half of.
 from __future__ import annotations
 
 import io
+import math
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -230,27 +231,62 @@ def read_header(source: Source) -> CopcHeaderInfo:
         )
 
 
-def _as_bounds(bbox: tuple[float, float, float, float]) -> Bounds:
-    """Turn a 2-D bounding box into the laspy ``Bounds`` the octree query takes.
+def _as_bounds(bbox: tuple[float, float, float, float], header: laspy.LasHeader) -> Bounds:
+    """Turn a 2-D bounding box into the laspy ``Bounds`` the octree query takes, clamped to the file.
 
     The box stays 2-D on purpose: laspy extends it over the file's full z range before querying, so no point is
     ever dropped for its elevation. Filtering in z is a cloud operation, not a read window.
 
+    The box is clamped to the file's own x/y extent before it reaches laspy. laspy clips in scaled ``int32``
+    space (``np.round((mins - offset) / scale)``), which overflows for coordinates past roughly ``±2.1e7`` at a
+    centimetre scale and silently returns zero points. Clamping first means a generously large or sentinel box
+    reads the whole cloud, which is what "give me everything in this area" has to mean.
+
     Args:
         bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS.
+        header: the open file's header, read for its ``x_min`` / ``y_min`` / ``x_max`` / ``y_max`` extent.
 
     Returns:
-        The equivalent :class:`laspy.copc.Bounds`.
+        The equivalent :class:`laspy.copc.Bounds`, clamped to the file's extent.
 
     Raises:
-        ValueError: when ``bbox`` is not four numbers, or either axis is inverted.
+        ValueError: when ``bbox`` is not four numbers, holds a non-finite value, or either axis is inverted.
     """
     if len(bbox) != 4:
         raise ValueError(f"bbox must be (xmin, ymin, xmax, ymax); got {len(bbox)} value(s): {bbox!r}")
     xmin, ymin, xmax, ymax = (float(value) for value in bbox)
+    # nan slips the inversion test below (nan > nan is False), so reject non-finite corners explicitly first.
+    if not all(math.isfinite(value) for value in (xmin, ymin, xmax, ymax)):
+        raise ValueError(f"bbox corners must be finite; got (xmin, ymin, xmax, ymax) = {(xmin, ymin, xmax, ymax)!r}")
     if xmin > xmax or ymin > ymax:
         raise ValueError(f"bbox is inverted: (xmin, ymin, xmax, ymax) = {(xmin, ymin, xmax, ymax)!r}")
-    return Bounds(mins=np.array([xmin, ymin]), maxs=np.array([xmax, ymax]))
+    return Bounds(
+        mins=np.array([max(xmin, header.x_min), max(ymin, header.y_min)]),
+        maxs=np.array([min(xmax, header.x_max), min(ymax, header.y_max)]),
+    )
+
+
+def _clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, float]) -> dict[str, np.ndarray]:
+    """Drop points outside ``bbox`` exactly, to the float edge.
+
+    laspy rounds the box edges to the file's coordinate scale before clipping, so its result can include points
+    up to half a scale unit outside the requested box - a whole boundary row, when an edge falls between grid
+    lines. This re-applies the box as an exact float mask so adjacent, non-overlapping windows never both claim
+    a boundary point. The arrays are already in memory, so the mask is cheap.
+
+    Args:
+        arrays: the mapping from :func:`pointclouds.io._records.extract`; must contain ``x`` and ``y``.
+        bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS.
+
+    Returns:
+        The same mapping with every array masked to the points inside the box.
+    """
+    xmin, ymin, xmax, ymax = bbox
+    x, y = arrays["x"], arrays["y"]
+    keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+    # An undeclared dimension is a zero-length array (the record contract); leave those untouched rather than
+    # index them with a full-length mask.
+    return {name: (values[keep] if values.size == keep.size else values) for name, values in arrays.items()}
 
 
 def read_window(
@@ -269,7 +305,9 @@ def read_window(
     Args:
         source: the COPC file to open, as a path or an open file object.
         bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS. Only chunks whose octree voxel overlaps the box are
-            fetched, and the points they hold are then clipped to it. 2-D: the full z range is always kept.
+            fetched, and the points are then clipped exactly to the box, to the float edge. 2-D: the full z
+            range is always kept. A box larger than the file is clamped to the file's extent; a non-finite
+            corner is rejected.
         resolution: target point spacing in the data's units. The octree is visited only down to the level that
             satisfies it, measured against :attr:`CopcHeaderInfo.spacing`, so a wide view stays cheap. Mutually
             exclusive with ``level``.
@@ -325,7 +363,14 @@ def read_window(
         raise ValueError(f"level must be a non-negative octree level; got {level!r}")
 
     requested = _records.resolve(dimensions)
-    bounds = None if bbox is None else _as_bounds(bbox)
+    # An exact bbox clip needs x and y even when the caller did not ask for them; read them, then drop them
+    # again if they were not requested.
+    needed = requested if bbox is None else tuple(dict.fromkeys(("x", "y", *requested)))
     with _reader(source) as reader:
+        bounds = None if bbox is None else _as_bounds(bbox, reader.header)
         points = reader.query(bounds=bounds, resolution=resolution, level=level)
-        return _records.extract(points, requested)
+        arrays = _records.extract(points, needed)
+        if bbox is not None:
+            arrays = _clip_to_box(arrays, bbox)
+            arrays = {name: arrays[name] for name in requested}
+        return arrays

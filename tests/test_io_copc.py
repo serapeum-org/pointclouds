@@ -452,3 +452,50 @@ class TestPointCloudWindow:
 
         assert cloud.loaded is False
         assert cloud.count == EXPECTED_COUNT
+
+
+class TestBoundingBoxRobustness:
+    """Inputs laspy's integer clipping would turn into silently wrong data (H1, M1)."""
+
+    def test_an_oversized_box_clamps_to_the_file_and_returns_everything(self, sample_copc):
+        """A box far larger than the data reads the whole cloud, not an empty one.
+
+        laspy clips in scaled int32 space, which overflows for coordinates past ~2.1e7 and hands back zero
+        points with only a numpy warning. A generous sentinel box is an ordinary request and must mean "all of
+        it".
+        """
+        arrays = copc.read_window(sample_copc, bbox=(-1e9, -1e9, 1e9, 1e9))
+
+        assert arrays["x"].size == EXPECTED_COUNT
+
+    @pytest.mark.parametrize(
+        "bbox",
+        [
+            (float("nan"), 0.0, 1.0, 1.0),
+            (0.0, 0.0, float("inf"), 1.0),
+            (float("-inf"), float("-inf"), float("inf"), float("inf")),
+        ],
+    )
+    def test_a_non_finite_box_is_refused(self, sample_copc, bbox):
+        """`nan`/`inf` corners are rejected up front, not cast to int32 garbage.
+
+        `nan` in particular slips the inversion check (`nan > nan` is False), so without an explicit finiteness
+        guard it would reach laspy and return an empty cloud in violation of the documented ValueError.
+        """
+        with pytest.raises(ValueError, match="finite"):
+            copc.read_window(sample_copc, bbox=bbox)
+
+    def test_points_are_clipped_exactly_to_the_box(self, sample_copc):
+        """No point outside the requested box is returned, to the float edge - not laspy's scale-rounded edge.
+
+        laspy rounds the box edges to the file's coordinate scale, so a box edge between grid lines would
+        otherwise pull in a whole row up to half a scale unit outside it.
+        """
+        bbox = (154994.053, 462996.640, 155021.535, 463049.997)
+
+        arrays = copc.read_window(sample_copc, bbox=bbox)
+
+        xmin, ymin, xmax, ymax = bbox
+        assert arrays["x"].size > 0
+        assert arrays["x"].min() >= xmin and arrays["x"].max() <= xmax
+        assert arrays["y"].min() >= ymin and arrays["y"].max() <= ymax
