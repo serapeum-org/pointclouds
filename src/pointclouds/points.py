@@ -312,7 +312,8 @@ class PointCloud:
 
         Args:
             target: for ``method="random"``, how many points to keep; never more than the cloud holds.
-            fraction: for ``method="random"``, the share of points to keep, in ``(0, 1]``.
+            fraction: for ``method="random"``, the share of points to keep, in ``(0, 1]``. A positive fraction
+                over a non-empty cloud keeps at least one point.
             method: ``"random"`` for a uniform sample without replacement, ``"voxel"`` for one point per cube.
             voxel_size: for ``method="voxel"``, the cube edge length in CRS units.
             seed: seeds the random sample so a run is reproducible; ignored by ``"voxel"``.

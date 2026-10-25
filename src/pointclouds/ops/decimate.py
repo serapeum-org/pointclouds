@@ -31,7 +31,8 @@ def select_indices(
     Args:
         cloud: the cloud to thin; its records are loaded if they are not in memory yet.
         target: for ``method="random"``, the number of points to keep. Never more than the cloud holds.
-        fraction: for ``method="random"``, the share of points to keep, in ``(0, 1]``.
+        fraction: for ``method="random"``, the share of points to keep, in ``(0, 1]``. A positive fraction over a
+            non-empty cloud keeps at least one point (it never rounds down to zero).
         method: ``"random"`` for a uniform sample without replacement, ``"voxel"`` for one point per cube.
         voxel_size: for ``method="voxel"``, the cube edge length in CRS units.
         seed: seeds the random sample so a run is reproducible; ignored by ``"voxel"``.
@@ -74,7 +75,9 @@ def _random_indices(n: int, *, target: int | None, fraction: float | None, seed:
         assert fraction is not None  # noqa: S101 - guaranteed by the exactly-one check above
         if not 0.0 < fraction <= 1.0:
             raise ValueError(f"fraction must be in (0, 1]; got {fraction}")
-        keep = min(int(round(fraction * n)), n)
+        # A positive fraction over a non-empty cloud keeps at least one point: rounding a small share down to
+        # zero would turn "keep some" into "keep none", which no caller asking for a fraction means.
+        keep = min(n, max(1, int(round(fraction * n)))) if n else 0
 
     rng = np.random.default_rng(seed)
     chosen = rng.choice(n, size=keep, replace=False)

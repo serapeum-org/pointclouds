@@ -145,6 +145,12 @@ class TestDecimate:
 
         assert len(empty.decimate(method="voxel", voxel_size=1.0)) == 0
 
+    def test_a_small_positive_fraction_keeps_at_least_one_point(self):
+        """A positive fraction over a non-empty cloud never rounds down to zero points."""
+        cloud = PointCloud(x=np.arange(2.0), y=np.zeros(2), z=np.zeros(2))
+
+        assert len(cloud.decimate(fraction=0.25, seed=0)) == 1
+
     def test_voxel_keeps_one_point_per_cube(self):
         """Points sharing a voxel collapse to the first of them, in point order."""
         cloud = PointCloud(x=np.array([0.0, 0.5, 1.0, 1.5]), y=np.zeros(4), z=np.zeros(4))
