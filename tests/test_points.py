@@ -7,6 +7,7 @@ import pytest
 
 from pointclouds import PointCloud
 from pointclouds.io import las
+from pointclouds.points import _has_vertical_axis
 
 EXPECTED_COUNT = 400
 EXPECTED_BOUNDS = (155000.0, 463000.0, 155038.0, 463038.0)
@@ -274,6 +275,13 @@ class TestToCrs:
         assert np.isfinite(ecef.z[0])
         assert abs(ecef.z[0]) > 1.0, "ellipsoidal height 0 maps to a large ECEF Z component"
 
+    def test_vertical_shift_is_refused_when_only_the_source_has_height(self):
+        """A 3-D source into a 2-D target with vertical=True still raises: the target cannot receive the shift."""
+        cloud = PointCloud(x=np.array([5.0]), y=np.array([52.0]), z=np.array([0.0]), crs="EPSG:4979")
+
+        with pytest.raises(ValueError, match="vertical"):
+            cloud.to_crs("EPSG:32631", vertical=True)
+
     def test_it_loads_a_lazy_cloud(self, sample_laz):
         """to_crs is a record operation, so it loads a lazy cloud before transforming."""
         cloud = PointCloud.read_file(sample_laz)
@@ -282,6 +290,36 @@ class TestToCrs:
 
         assert len(out) == EXPECTED_COUNT
         assert out.crs.to_epsg() == 4326
+
+
+class TestHasVerticalAxis:
+    """The `_has_vertical_axis` helper: does a CRS carry height a vertical shift could use?"""
+
+    @pytest.mark.parametrize(
+        "code, expected, operand",
+        [
+            ("EPSG:7415", True, "compound (RD New + NAP height)"),
+            ("EPSG:5703", True, "pure vertical CRS (NAP height)"),
+            ("EPSG:4979", True, "3-D geographic (three axes)"),
+            ("EPSG:32631", False, "2-D projected"),
+            ("EPSG:4326", False, "2-D geographic"),
+        ],
+    )
+    def test_detects_a_vertical_component(self, code, expected, operand):
+        """Each `or` operand decides the result.
+
+        Args:
+            code: the EPSG code to inspect.
+            expected: whether the CRS should be reported as carrying height.
+            operand: which clause of ``is_compound or is_vertical or naxes >= 3`` drives the answer.
+
+        Test scenario:
+            Compound, pure-vertical and 3-D CRSs report ``True``; plain 2-D horizontal CRSs report ``False``.
+        """
+        from pyproj import CRS
+
+        result = _has_vertical_axis(CRS.from_user_input(code))
+        assert result is expected, f"{code} ({operand}) should be {expected}, got {result}"
 
 
 def test_the_phase_0_vertical_slice(sample_laz):
