@@ -15,10 +15,13 @@ via :meth:`PointCloud.load`. The distinction that matters, and the reason ``coun
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
-from pyproj import CRS
+from pyproj import CRS, Transformer
+from pyproj.transformer import TransformerGroup
 
 from pointclouds.io import las as _las
 
@@ -253,6 +256,150 @@ class PointCloud:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
         return np.column_stack(cols)
 
+    def to_crs(
+        self,
+        crs: CRS | str | int,
+        *,
+        vertical: bool = False,
+        on_invalid: Literal["raise", "mask", "drop"] = "raise",
+    ) -> PointCloud:
+        """Reproject the cloud into another CRS with pyproj, returning a new cloud.
+
+        The transform is built with ``Transformer.from_crs(..., always_xy=True)``, so coordinates are always
+        read and written in ``(x, y)`` / easting-northing / longitude-latitude order regardless of the axis
+        order the EPSG registry declares for either CRS (e.g. EPSG:4326's registry order is lat/lon, yet this
+        returns lon in ``x`` and lat in ``y``).
+
+        **Vertical datum.** By default (``vertical=False``) only x and y are transformed; z is carried over
+        unchanged, still in the source vertical datum. This is the right choice when the target is a 2-D
+        horizontal CRS - there is no vertical transformation to apply - but it means a 3-D reprojection is never
+        done implicitly. To shift z as well, pass ``vertical=True``; this requires a compound or 3-D CRS on both
+        sides (one that carries a vertical axis) and raises ``ValueError`` otherwise. The most accurate vertical
+        operation is then used, and if its grid (e.g. a geoid model) is not installed the transform is refused
+        with ``ValueError`` rather than falling back to a less-accurate operation or to one that passes z through
+        untouched. The trade-off is strict - a legitimate vertical reprojection is refused on an install lacking
+        that grid - but it guarantees z is never silently left in the source datum when a vertical transform was
+        asked for, and it does so the same way on every pyproj/PROJ build.
+
+        **Out-of-domain points** are handled by ``on_invalid``. By default (``"raise"``) a coordinate outside the
+        transform's area of use raises ``ProjError``, and because that is all-or-nothing a single non-computable
+        point aborts the whole reprojection. A cloud that may carry sentinel or noise coordinates (e.g. stray
+        ``0, 0``) can instead pass ``on_invalid="mask"`` to set each unreprojectable point to ``NaN`` in x/y/z
+        (keeping the point count and attribute alignment), or ``on_invalid="drop"`` to remove those points and
+        their attribute rows (shrinking the cloud). Both lenient modes keep every other point.
+
+        Present attribute arrays (intensity, classification, return number) are carried over by value - the
+        returned cloud owns independent copies, so editing it never reaches back into the source - and stay
+        aligned with the reprojected coordinates; an absent attribute is carried over as the same empty array. The
+        whole cloud is materialised: a lazy source is loaded first, and the cost is O(N) in points, with no
+        chunked/streaming path.
+
+        Args:
+            crs: the target CRS, as anything :class:`pyproj.CRS` accepts (an int or string EPSG code, WKT, a
+                ``CRS``).
+            vertical: when ``True``, transform z as well as x/y; requires a vertical/compound CRS on both sides.
+            on_invalid: what to do with points outside the transform's domain - ``"raise"`` (the default; one bad
+                point raises ``ProjError``), ``"mask"`` (set them to ``NaN``, preserving count and alignment), or
+                ``"drop"`` (remove them and their attribute rows).
+
+        Returns:
+            A new, loaded :class:`PointCloud` in ``crs``, with x/y (and z when ``vertical``) transformed. With
+            ``on_invalid="drop"`` it holds only the points that reprojected; otherwise it has the same count as
+            ``self``.
+
+        Raises:
+            ValueError: when ``on_invalid`` is not one of ``"raise"``/``"mask"``/``"drop"``; when :attr:`crs` is
+                ``None`` (no source CRS to transform from); when ``vertical`` is ``True`` but the source or target
+                CRS carries no vertical axis; or when ``vertical`` is ``True`` and the required vertical-datum
+                operation (e.g. a geoid grid) is not installed.
+            pyproj.exceptions.ProjError: when ``on_invalid="raise"`` and a point falls outside the transform's
+                domain (a single such point aborts the whole reprojection).
+
+        Examples:
+            - Reproject a Dutch RD New cloud into UTM zone 31N; the result reports the target CRS:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1),
+                ...                    crs="EPSG:28992")
+                >>> utm = cloud.to_crs("EPSG:32631")
+                >>> utm.crs.to_epsg()
+                32631
+
+                ```
+            - ``always_xy=True`` means longitude lands in ``x`` and latitude in ``y`` even for EPSG:4326,
+              whose registry order is lat/lon:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1),
+                ...                    crs="EPSG:28992")
+                >>> wgs = cloud.to_crs("EPSG:4326")
+                >>> round(float(wgs.x[0]), 2), round(float(wgs.y[0]), 2)
+                (5.39, 52.16)
+
+                ```
+            - A cloud with no CRS has nothing to transform from, so it refuses:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1))
+                >>> cloud.to_crs("EPSG:4326")
+                Traceback (most recent call last):
+                    ...
+                ValueError: cannot reproject a cloud whose crs is None; set a source CRS first
+
+                ```
+        """
+        if on_invalid not in ("raise", "mask", "drop"):
+            raise ValueError(f"on_invalid must be 'raise', 'mask' or 'drop'; got {on_invalid!r}")
+        if self._crs is None:
+            raise ValueError("cannot reproject a cloud whose crs is None; set a source CRS first")
+        target = CRS.from_user_input(crs)
+        if vertical and not (_has_vertical_axis(self._crs) and _has_vertical_axis(target)):
+            raise ValueError(
+                "vertical=True needs a compound or 3-D CRS (one with a vertical axis) on both sides; "
+                f"got source {self._crs.to_string()!r} and target {target.to_string()!r}. Refusing rather "
+                "than leaving z in the source datum."
+            )
+        errcheck = on_invalid == "raise"
+        if vertical:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")  # the "best unavailable" warning is turned into a raise below
+                group = TransformerGroup(self._crs, target, always_xy=True)
+            if not group.best_available:
+                raise ValueError(
+                    "vertical=True needs the most accurate vertical operation between "
+                    f"{self._crs.to_string()!r} and {target.to_string()!r}, but its grid (e.g. a geoid model) "
+                    "is not installed; refusing rather than leaving z in the source datum."
+                )
+            x, y, z = group.transformers[0].transform(self.x, self.y, self.z, errcheck=errcheck)
+        else:
+            transformer = Transformer.from_crs(self._crs, target, always_xy=True)
+            x, y = transformer.transform(self.x, self.y, errcheck=errcheck)
+            z = self.z.copy()
+        intensity = self.intensity.copy()
+        classification = self.classification.copy()
+        return_number = self.return_number.copy()
+        if on_invalid != "raise":
+            x, y, z = np.asarray(x, np.float64), np.asarray(y, np.float64), np.asarray(z, np.float64)
+            valid = np.isfinite(x) & np.isfinite(y)
+            if vertical:
+                valid &= np.isfinite(z)
+            if on_invalid == "mask":
+                x[~valid] = y[~valid] = z[~valid] = np.nan
+            else:  # "drop" - remove the unreprojectable points and their attributes, keeping alignment
+                x, y, z = x[valid], y[valid], z[valid]
+                intensity = intensity[valid] if intensity.size else intensity
+                classification = classification[valid] if classification.size else classification
+                return_number = return_number[valid] if return_number.size else return_number
+        return PointCloud(
+            x=x,
+            y=y,
+            z=z,
+            intensity=intensity,
+            classification=classification,
+            return_number=return_number,
+            crs=target,
+        )
+
     def __len__(self) -> int:
         """Return how many points are in memory, loading the records first if needed.
 
@@ -268,6 +415,21 @@ class PointCloud:
 
 
 _EMPTY_F8 = np.empty(0, dtype=np.float64)
+
+
+def _has_vertical_axis(crs: CRS) -> bool:
+    """Whether ``crs`` carries height, so a vertical datum shift is meaningful.
+
+    True for a compound CRS (horizontal + vertical), a 3-D CRS (three axes), or a bare vertical CRS; false for a
+    plain 2-D horizontal CRS, where there is no z to transform.
+
+    Args:
+        crs: the CRS to inspect.
+
+    Returns:
+        ``True`` when the CRS has a vertical component.
+    """
+    return crs.is_compound or crs.is_vertical or len(crs.axis_info) >= 3
 
 
 def _as_attribute(values: np.ndarray | None, dtype: type) -> np.ndarray:
