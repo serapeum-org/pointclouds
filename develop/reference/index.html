@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -8078,8 +8078,10 @@ dropped afterwards. It trims the result, not the read.</p>
             <td>
               <div class="doc-md-description">
                 <p>when a path's suffix is not <code>.laz</code>; when the file carries no COPC octree; when <code>bbox</code> is
-malformed; when <code>resolution</code> is not positive; when <code>level</code> is negative; or when <code>resolution</code>
-and <code>level</code> are both given.</p>
+malformed, non-finite or inverted; when <code>resolution</code> is not a positive finite number; when
+<code>level</code> is not a non-negative <code>int</code> or <code>range</code> of octree levels (a <code>bool</code>, a float, a
+negative level, or an empty range are all rejected); or when <code>resolution</code> and <code>level</code> are both
+given.</p>
               </div>
             </td>
           </tr>
@@ -8193,7 +8195,9 @@ and <code>level</code> are both given.</p>
 <span class="normal"><a href="#__codelineno-0-425">425</a></span>
 <span class="normal"><a href="#__codelineno-0-426">426</a></span>
 <span class="normal"><a href="#__codelineno-0-427">427</a></span>
-<span class="normal"><a href="#__codelineno-0-428">428</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-359" name="__codelineno-0-359"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_window</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-428">428</a></span>
+<span class="normal"><a href="#__codelineno-0-429">429</a></span>
+<span class="normal"><a href="#__codelineno-0-430">430</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-359" name="__codelineno-0-359"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_window</span><span class="p">(</span>
 <a id="__codelineno-0-360" name="__codelineno-0-360"></a>    <span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">,</span>
 <a id="__codelineno-0-361" name="__codelineno-0-361"></a>    <span class="o">*</span><span class="p">,</span>
 <a id="__codelineno-0-362" name="__codelineno-0-362"></a>    <span class="n">bbox</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8231,38 +8235,40 @@ and <code>level</code> are both given.</p>
 <a id="__codelineno-0-394" name="__codelineno-0-394"></a><span class="sd">    Raises:</span>
 <a id="__codelineno-0-395" name="__codelineno-0-395"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
 <a id="__codelineno-0-396" name="__codelineno-0-396"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is</span>
-<a id="__codelineno-0-397" name="__codelineno-0-397"></a><span class="sd">            malformed; when ``resolution`` is not positive; when ``level`` is negative; or when ``resolution``</span>
-<a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="sd">            and ``level`` are both given.</span>
-<a id="__codelineno-0-399" name="__codelineno-0-399"></a><span class="sd">        KeyError: when a requested dimension is not one this package reads.</span>
-<a id="__codelineno-0-400" name="__codelineno-0-400"></a>
-<a id="__codelineno-0-401" name="__codelineno-0-401"></a><span class="sd">    Examples:</span>
-<a id="__codelineno-0-402" name="__codelineno-0-402"></a><span class="sd">        A bounding box reads a corner of the cloud, fetching only the chunks that reach into it:</span>
-<a id="__codelineno-0-403" name="__codelineno-0-403"></a>
-<a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="sd">        &gt;&gt;&gt; arrays = read_window(  # doctest: +SKIP</span>
-<a id="__codelineno-0-405" name="__codelineno-0-405"></a><span class="sd">        ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)</span>
-<a id="__codelineno-0-406" name="__codelineno-0-406"></a><span class="sd">        ... )</span>
-<a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">        &gt;&gt;&gt; arrays["x"].size  # 121 of the file's 1600 points  # doctest: +SKIP</span>
-<a id="__codelineno-0-408" name="__codelineno-0-408"></a><span class="sd">        121</span>
-<a id="__codelineno-0-409" name="__codelineno-0-409"></a>
-<a id="__codelineno-0-410" name="__codelineno-0-410"></a><span class="sd">        A resolution reads the whole extent sparsely instead, which is what a zoomed-out view wants:</span>
+<a id="__codelineno-0-397" name="__codelineno-0-397"></a><span class="sd">            malformed, non-finite or inverted; when ``resolution`` is not a positive finite number; when</span>
+<a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="sd">            ``level`` is not a non-negative ``int`` or ``range`` of octree levels (a ``bool``, a float, a</span>
+<a id="__codelineno-0-399" name="__codelineno-0-399"></a><span class="sd">            negative level, or an empty range are all rejected); or when ``resolution`` and ``level`` are both</span>
+<a id="__codelineno-0-400" name="__codelineno-0-400"></a><span class="sd">            given.</span>
+<a id="__codelineno-0-401" name="__codelineno-0-401"></a><span class="sd">        KeyError: when a requested dimension is not one this package reads.</span>
+<a id="__codelineno-0-402" name="__codelineno-0-402"></a>
+<a id="__codelineno-0-403" name="__codelineno-0-403"></a><span class="sd">    Examples:</span>
+<a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="sd">        A bounding box reads a corner of the cloud, fetching only the chunks that reach into it:</span>
+<a id="__codelineno-0-405" name="__codelineno-0-405"></a>
+<a id="__codelineno-0-406" name="__codelineno-0-406"></a><span class="sd">        &gt;&gt;&gt; arrays = read_window(  # doctest: +SKIP</span>
+<a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">        ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)</span>
+<a id="__codelineno-0-408" name="__codelineno-0-408"></a><span class="sd">        ... )</span>
+<a id="__codelineno-0-409" name="__codelineno-0-409"></a><span class="sd">        &gt;&gt;&gt; arrays["x"].size  # 121 of the file's 1600 points  # doctest: +SKIP</span>
+<a id="__codelineno-0-410" name="__codelineno-0-410"></a><span class="sd">        121</span>
 <a id="__codelineno-0-411" name="__codelineno-0-411"></a>
-<a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">        &gt;&gt;&gt; coarse = read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP</span>
-<a id="__codelineno-0-413" name="__codelineno-0-413"></a><span class="sd">        &gt;&gt;&gt; coarse["x"].size, coarse["classification"].size  # doctest: +SKIP</span>
-<a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        (100, 100)</span>
-<a id="__codelineno-0-415" name="__codelineno-0-415"></a>
-<a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">        The two compose, and a dimension list selects which arrays come back:</span>
+<a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">        A resolution reads the whole extent sparsely instead, which is what a zoomed-out view wants:</span>
+<a id="__codelineno-0-413" name="__codelineno-0-413"></a>
+<a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        &gt;&gt;&gt; coarse = read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP</span>
+<a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">        &gt;&gt;&gt; coarse["x"].size, coarse["classification"].size  # doctest: +SKIP</span>
+<a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">        (100, 100)</span>
 <a id="__codelineno-0-417" name="__codelineno-0-417"></a>
-<a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        &gt;&gt;&gt; corner = read_window(  # doctest: +SKIP</span>
-<a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">        ...     "examples/data/sample.copc.laz",</span>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        ...     bbox=(155000, 463000, 155020, 463020),</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">        ...     resolution=7.8,</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">        ...     dimensions=("X", "Y"),</span>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">        ... )</span>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        &gt;&gt;&gt; sorted(corner)  # doctest: +SKIP</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">        ['x', 'y']</span>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">    """</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a>        <span class="k">return</span> <span class="n">_query_window</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">dimensions</span><span class="p">)</span>
+<a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        The two compose, and a dimension list selects which arrays come back:</span>
+<a id="__codelineno-0-419" name="__codelineno-0-419"></a>
+<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        &gt;&gt;&gt; corner = read_window(  # doctest: +SKIP</span>
+<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">        ...     "examples/data/sample.copc.laz",</span>
+<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">        ...     bbox=(155000, 463000, 155020, 463020),</span>
+<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">        ...     resolution=7.8,</span>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        ...     dimensions=("X", "Y"),</span>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">        ... )</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        &gt;&gt;&gt; sorted(corner)  # doctest: +SKIP</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        ['x', 'y']</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">    """</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a>        <span class="k">return</span> <span class="n">_query_window</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">dimensions</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
