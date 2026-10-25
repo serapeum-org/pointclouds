@@ -198,8 +198,9 @@ def write_dataset(root: Path, data_type: str) -> int:
         hierarchy[key] = int(sel.size)
 
     count = int(arrays["x"].size)
-    (root / "ept.json").write_text(json.dumps(manifest(data_type, cube_min, side, arrays, count), indent=2))
-    (root / "ept-hierarchy" / "0-0-0-0.json").write_text(json.dumps(hierarchy, indent=2))
+    # Trailing newline so pre-commit's end-of-file-fixer leaves the committed fixtures untouched.
+    (root / "ept.json").write_text(json.dumps(manifest(data_type, cube_min, side, arrays, count), indent=2) + "\n")
+    (root / "ept-hierarchy" / "0-0-0-0.json").write_text(json.dumps(hierarchy, indent=2) + "\n")
     return count
 
 
