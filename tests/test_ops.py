@@ -255,6 +255,15 @@ class TestMerge:
         with pytest.raises(ValueError, match="at least one cloud"):
             PointCloud.merge([])
 
+    def test_merge_accepts_an_empty_cloud_alongside_an_attributed_one(self, attributed_cloud):
+        """A cloud that filtered to empty is a no-op participant in a merge, not an attribute mismatch."""
+        empty = attributed_cloud.filter(classification=99)
+
+        merged = PointCloud.merge([empty, attributed_cloud])
+
+        assert len(merged) == 4
+        assert merged.classification.tolist() == [2, 5, 2, 6]
+
     def test_merge_treats_a_missing_crs_as_a_conflict(self):
         """A cloud with a CRS and one without do not agree, so the merge is refused, not guessed."""
         known = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), crs="EPSG:28992")

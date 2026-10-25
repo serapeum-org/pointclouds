@@ -52,6 +52,7 @@ def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
     if not clouds:
         raise ValueError("merge needs at least one cloud")
 
+    point_counts = [c.x.shape[0] for c in clouds]  # also forces any lazy cloud to load
     merged: dict[str, Any] = {
         "x": np.concatenate([c.x for c in clouds]),
         "y": np.concatenate([c.y for c in clouds]),
@@ -61,8 +62,11 @@ def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
 
     for name in _ATTRIBUTES:
         arrays = [getattr(c, name) for c in clouds]
-        present = [values.size > 0 for values in arrays]
-        if all(present):
+        # A zero-point cloud (e.g. one filtered to empty) contributes no rows, so it neither has nor needs the
+        # attribute: judge presence only among the clouds that actually carry points. Its size-0 array still
+        # concatenates harmlessly when the attribute is kept.
+        present = [values.size > 0 for values, count in zip(arrays, point_counts, strict=True) if count > 0]
+        if present and all(present):
             merged[name] = np.concatenate(arrays)
         elif any(present):
             raise ValueError(
