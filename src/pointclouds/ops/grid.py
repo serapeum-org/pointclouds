@@ -66,7 +66,9 @@ def to_grid(
             ``radius`` of the pixel centre.
         radius: the search radius for ``mode="radius"``; defaults to ``cell_size * sqrt(2)`` (PDAL's default)
             when ``None``. Ignored in bin mode.
-        bounds: ``(xmin, ymin, xmax, ymax)`` extent to grid; defaults to the cloud's own bounds.
+        bounds: ``(xmin, ymin, xmax, ymax)`` extent to grid; defaults to the cloud's own bounds. When its width
+            or height is not a whole multiple of ``cell_size``, the grid is rounded up to whole cells and so
+            extends past ``bounds``; points within that physical extent are kept, not dropped.
         nodata: the value written to empty cells. The default ``NaN`` forces a float grid. ``count`` is the one
             exception - an empty cell counts ``0``, not ``nodata``.
 
@@ -104,7 +106,7 @@ def to_grid(
 
     x, y, z = cloud.x, cloud.y, cloud.z
     if mode == "bin":
-        cell, values, distance = _bin_contributions(x, y, z, xmin, xmax, ymin, ymax, cell_size, ncols, nrows)
+        cell, values, distance = _bin_contributions(x, y, z, xmin, ymax, cell_size, ncols, nrows)
     else:
         cell, values, distance = _radius_contributions(
             x, y, z, xmin, ymax, cell_size, ncols, nrows, radius if radius is not None else cell_size * math.sqrt(2)
@@ -115,17 +117,21 @@ def to_grid(
     return flat.reshape(nrows, ncols), transform, cloud.crs
 
 
-def _bin_contributions(x, y, z, xmin, xmax, ymin, ymax, cell_size, ncols, nrows):
+def _bin_contributions(x, y, z, xmin, ymax, cell_size, ncols, nrows):
     """Assign each point to the one cell it falls in, dropping points outside the grid.
 
-    Membership is the closed box ``[xmin, xmax] x [ymin, ymax]``, and the cell index is then clamped into the
-    grid, so a point exactly on the max-x or min-y edge folds into the last column/row (the closed-last-edge rule
-    ``np.histogram2d`` uses) instead of being discarded. That matters on the default call path, where ``bounds``
-    is the cloud's own extent and ``xmax``/``ymin`` are by construction real points.
+    The grid is anchored at the top-left ``(xmin, ymax)`` and spans whole cells, so its physical extent reaches
+    ``xmin + ncols*cell_size`` / ``ymax - nrows*cell_size`` - past a ``bounds`` that is not a whole multiple of
+    ``cell_size``. Membership is that physical box, and the cell index is then clamped into the grid, so a point
+    on any edge - the ceil-rounded overhang as well as the max-x / min-y edge of the default extent (where
+    ``bounds`` is the data's own min/max) - folds into the cell that visually covers it (the closed-last-edge rule
+    ``np.histogram2d`` uses) instead of being discarded.
 
     Returns the flat cell index, the z-value and the distance to that cell's centre, one entry per kept point.
     """
-    inside = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+    x_max = xmin + ncols * cell_size
+    y_min = ymax - nrows * cell_size
+    inside = (x >= xmin) & (x <= x_max) & (y >= y_min) & (y <= ymax)
     xi, yi, zi = x[inside], y[inside], z[inside]
     col = np.clip(np.floor((xi - xmin) / cell_size).astype(np.int64), 0, ncols - 1)
     row = np.clip(np.floor((ymax - yi) / cell_size).astype(np.int64), 0, nrows - 1)

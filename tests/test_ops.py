@@ -442,6 +442,15 @@ class TestToGrid:
         assert array.sum() == 2.0
         assert array[0, 0] == 1.0 and array[1, 1] == 1.0
 
+    def test_points_in_the_ceil_rounded_overhang_are_kept(self):
+        """When bounds isn't a multiple of cell_size, the last cell accepts points in its physical overhang."""
+        cloud = PointCloud(x=np.array([1.0, 10.5]), y=np.array([5.0, 5.0]), z=np.array([1.0, 2.0]))
+
+        array, transform, _ = cloud.to_grid(cell_size=3.0, aggregate="count", bounds=(0.0, 0.0, 10.0, 10.0))
+
+        assert array.sum() == 2.0
+        assert transform[1] == 3.0
+
     def test_percentile_of_an_empty_grid_is_all_nodata(self):
         """A percentile grid with no points in the extent is entirely nodata, not an error."""
         cloud = PointCloud(x=np.array([9.0]), y=np.array([9.0]), z=np.array([1.0]))
