@@ -417,8 +417,9 @@ class PointCloud:
             affine 6-tuple ``(xmin, cell_size, 0, ymax, 0, -cell_size)``, and the cloud's CRS.
 
         Raises:
-            ValueError: on a non-positive ``cell_size``, a non-positive-area ``bounds``, an unknown ``mode``, or an
-                unrecognised ``aggregate``.
+            ValueError: on a non-positive ``cell_size``; a non-positive-area extent (a degenerate ``bounds``, or
+                the default extent of a flat cloud whose points share a single x or a single y); an unknown
+                ``mode``; or an unrecognised ``aggregate``.
 
         Examples:
             >>> import numpy as np

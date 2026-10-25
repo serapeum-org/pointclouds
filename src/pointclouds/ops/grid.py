@@ -72,8 +72,10 @@ def to_grid(
         affine 6-tuple ``(xmin, cell_size, 0, ymax, 0, -cell_size)``, and the cloud's CRS.
 
     Raises:
-        ValueError: when ``cell_size`` is not positive, when ``bounds`` has a non-positive extent, when ``mode``
-            is neither ``"bin"`` nor ``"radius"``, or when ``aggregate`` is not a recognised name.
+        ValueError: when ``cell_size`` is not positive; when the extent has a non-positive area - either a
+            ``bounds`` with ``xmax <= xmin`` or ``ymax <= ymin``, or the default extent of a flat cloud whose
+            points share a single x or a single y; when ``mode`` is neither ``"bin"`` nor ``"radius"``; or when
+            ``aggregate`` is not a recognised name.
 
     Examples:
         >>> import numpy as np

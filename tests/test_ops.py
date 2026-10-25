@@ -373,6 +373,13 @@ class TestToGrid:
         with pytest.raises(ValueError, match="positive-area bounds"):
             grid_cloud.to_grid(cell_size=1.0, bounds=(0.0, 0.0, 0.0, 2.0))
 
+    def test_a_flat_default_extent_is_refused(self):
+        """A collinear cloud (all points sharing one y) has a zero-area default extent and cannot be gridded."""
+        transect = PointCloud(x=np.array([0.0, 1.0, 2.0, 3.0]), y=np.zeros(4), z=np.zeros(4))
+
+        with pytest.raises(ValueError, match="positive-area bounds"):
+            transect.to_grid(cell_size=1.0)
+
     def test_a_non_positive_cell_size_is_refused(self, grid_cloud):
         """The pixel edge must be positive."""
         with pytest.raises(ValueError, match="cell_size must be positive"):
