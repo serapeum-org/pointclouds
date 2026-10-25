@@ -54,6 +54,25 @@ def resolve(dimensions: tuple[str, ...] | None) -> tuple[str, ...]:
 
     Raises:
         KeyError: when a requested dimension is not one the engines know, listing what they do read.
+
+    Examples:
+        LAS spells dimensions inconsistently, so the request is normalised and the caller's order kept:
+
+        >>> resolve(("Z", "Intensity"))
+        ('z', 'intensity')
+
+        ``None`` is the "everything this package maps" request, which is what both engines pass by default:
+
+        >>> resolve(None)
+        ('x', 'y', 'z', 'intensity', 'classification', 'return_number')
+
+        A dimension the package does not map is refused rather than quietly returned empty:
+
+        >>> resolve(("x", "gps_time"))
+        Traceback (most recent call last):
+            ...
+        KeyError: "unknown dimension(s) ['gps_time']; this engine reads ['classification', 'intensity', \
+'return_number', 'x', 'y', 'z']"
     """
     requested = tuple(CANONICAL) if dimensions is None else tuple(name.lower() for name in dimensions)
     unknown = [name for name in requested if name not in CANONICAL]
@@ -70,6 +89,20 @@ def declared_names(source: _RecordSource) -> set[str]:
 
     Returns:
         The declared dimension names, lower-cased.
+
+    Examples:
+        Point format 6 declares the attributes this package reads, whatever a given file happens to populate:
+
+        >>> import laspy
+        >>> cloud = laspy.LasData(laspy.LasHeader(version="1.4", point_format=6))
+        >>> names = declared_names(cloud)
+        >>> {"x", "y", "z", "intensity", "classification", "return_number"} <= names
+        True
+
+        The names come back lower-cased, so membership tests work against the canonical keys:
+
+        >>> "X" in declared_names(cloud), "x" in declared_names(cloud)
+        (False, True)
     """
     return {str(name).lower() for name in source.point_format.dimension_names}
 
@@ -85,6 +118,34 @@ def extract(source: _RecordSource, requested: tuple[str, ...]) -> dict[str, np.n
         A mapping of dimension name to array. A dimension the source's point format does not declare comes back
         as a zero-length array of the right dtype, never as a missing key - so every caller can index the result
         by any requested name.
+
+    Examples:
+        Only the requested dimensions are read, which is what makes a partial read cheaper than a full one:
+
+        >>> import laspy
+        >>> import numpy as np
+        >>> cloud = laspy.LasData(laspy.LasHeader(version="1.4", point_format=6))
+        >>> cloud.x = np.array([10.0, 20.0])
+        >>> cloud.y = np.array([0.0, 5.0])
+        >>> cloud.z = np.array([1.0, 2.0])
+        >>> arrays = extract(cloud, ("x", "z"))
+        >>> sorted(arrays)
+        ['x', 'z']
+        >>> arrays["z"].tolist()
+        [1.0, 2.0]
+
+        Each array is cast to its canonical dtype, so a caller never has to check what the file used:
+
+        >>> cloud = laspy.LasData(laspy.LasHeader(version="1.4", point_format=6))
+        >>> cloud.x = np.array([1.0])
+        >>> cloud.y = np.array([2.0])
+        >>> cloud.z = np.array([3.0])
+        >>> cloud.classification = np.array([5])
+        >>> arrays = extract(cloud, ("classification", "x"))
+        >>> arrays["classification"].dtype.name, arrays["x"].dtype.name
+        ('uint8', 'float64')
+        >>> arrays["classification"].tolist()
+        [5]
     """
     declared = declared_names(source)
     arrays: dict[str, np.ndarray] = {}

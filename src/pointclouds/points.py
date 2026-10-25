@@ -137,9 +137,21 @@ class PointCloud:
                 :meth:`read_window` rejects.
 
         Examples:
+            Without a window the read is header-first: the metadata costs nothing and the records wait:
+
             >>> cloud = PointCloud.read_file("examples/data/sample.laz")  # doctest: +SKIP
             >>> cloud.count, cloud.crs is not None  # header only - no records touched  # doctest: +SKIP
             (400, True)
+            >>> cloud.loaded  # doctest: +SKIP
+            False
+
+            Passing a window makes it a COPC read instead, and the cloud comes back already populated:
+
+            >>> window = PointCloud.read_file(  # doctest: +SKIP
+            ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)
+            ... )
+            >>> window.count, window.loaded  # doctest: +SKIP
+            (121, True)
         """
         if bbox is not None or resolution is not None or level is not None:
             return cls.read_window(path, bbox=bbox, resolution=resolution, level=level)
@@ -194,11 +206,29 @@ class PointCloud:
                 given.
 
         Examples:
+            A box reads a corner of the cloud, and the resulting cloud describes the window it holds:
+
             >>> window = PointCloud.read_window(  # doctest: +SKIP
             ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)
             ... )
             >>> window.count  # 121 of the file's 1600 points  # doctest: +SKIP
             121
+            >>> window.bounds  # doctest: +SKIP
+            (155000.0, 463000.0, 155020.0, 463020.0)
+
+            A resolution thins the whole extent instead, which is what a zoomed-out view wants:
+
+            >>> coarse = PointCloud.read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP
+            >>> coarse.count, coarse.crs.to_epsg()  # doctest: +SKIP
+            (100, 28992)
+
+            A window that selects nothing is an empty cloud, not an error:
+
+            >>> nothing = PointCloud.read_window(  # doctest: +SKIP
+            ...     "examples/data/sample.copc.laz", bbox=(0, 0, 1, 1)
+            ... )
+            >>> nothing.count  # doctest: +SKIP
+            0
         """
         crs = _copc.read_header(source).crs
         arrays = _copc.read_window(source, bbox=bbox, resolution=resolution, level=level)

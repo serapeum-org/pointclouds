@@ -64,6 +64,28 @@ class CopcHeaderInfo(LasHeaderInfo):
         spacing: the root node's point spacing, in the data's own units (metres for a projected CRS). The octree
             halves it at every level, so a level ``n`` node has spacing ``spacing / 2**n``. This is the number
             ``resolution=`` is measured against - ask for ``resolution=spacing`` and only the root is read.
+
+    Examples:
+        ``spacing`` is what turns a target resolution into an octree depth, so a caller can work out how deep a
+        view will have to go before paying for the read:
+
+        >>> info = CopcHeaderInfo(
+        ...     count=1600,
+        ...     bounds=(155000.0, 463000.0, 155078.0, 463078.0),
+        ...     crs=None,
+        ...     dimensions=("X", "Y", "Z"),
+        ...     version="1.4",
+        ...     point_format=6,
+        ...     spacing=7.8,
+        ... )
+        >>> info.spacing / 2**2  # the spacing two levels down
+        1.95
+
+        Everything the LAS header answers is here too, so the file's extent and size are known before any
+        record is read:
+
+        >>> info.count, info.bounds[:2]
+        (1600, (155000.0, 463000.0))
     """
 
     spacing: float
@@ -148,8 +170,18 @@ def is_copc(source: Source) -> bool:
         ValueError: when a path's suffix is not ``.laz`` - an uncompressed ``.las`` is never COPC.
 
     Examples:
+        An indexed cloud answers yes, and a plain LAZ answers no rather than raising - that is the question:
+
         >>> is_copc("examples/data/sample.copc.laz")  # doctest: +SKIP
         True
+        >>> is_copc("examples/data/sample.laz")  # doctest: +SKIP
+        False
+
+        Which makes it the way to choose a read path for a file of unknown provenance:
+
+        >>> path = "examples/data/sample.laz"  # doctest: +SKIP
+        >>> read_window(path, bbox=(0, 0, 1, 1)) if is_copc(path) else "read it whole instead"  # doctest: +SKIP
+        'read it whole instead'
     """
     resolved = _resolve(source)  # a bad suffix or a missing file is an error, not a "no" answer
     try:
@@ -173,9 +205,17 @@ def read_header(source: Source) -> CopcHeaderInfo:
         ValueError: when a path's suffix is not ``.laz``, or the file carries no COPC octree.
 
     Examples:
+        The size and extent of a cloud are answerable before deciding whether to read any of it:
+
         >>> info = read_header("examples/data/sample.copc.laz")  # doctest: +SKIP
         >>> info.count, info.spacing  # header only - no records touched  # doctest: +SKIP
         (1600, 7.8)
+
+        ``spacing`` says what a coarse read will cost: asking for it reads the root node alone:
+
+        >>> info = read_header("examples/data/sample.copc.laz")  # doctest: +SKIP
+        >>> read_window("examples/data/sample.copc.laz", resolution=info.spacing)["x"].size  # doctest: +SKIP
+        100
     """
     with _reader(source) as reader:
         header = reader.header
@@ -252,11 +292,30 @@ def read_window(
         KeyError: when a requested dimension is not one this package reads.
 
     Examples:
+        A bounding box reads a corner of the cloud, fetching only the chunks that reach into it:
+
         >>> arrays = read_window(  # doctest: +SKIP
         ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)
         ... )
         >>> arrays["x"].size  # 121 of the file's 1600 points  # doctest: +SKIP
         121
+
+        A resolution reads the whole extent sparsely instead, which is what a zoomed-out view wants:
+
+        >>> coarse = read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP
+        >>> coarse["x"].size, coarse["classification"].size  # doctest: +SKIP
+        (100, 100)
+
+        The two compose, and a dimension list trims what is decompressed per point:
+
+        >>> corner = read_window(  # doctest: +SKIP
+        ...     "examples/data/sample.copc.laz",
+        ...     bbox=(155000, 463000, 155020, 463020),
+        ...     resolution=7.8,
+        ...     dimensions=("X", "Y"),
+        ... )
+        >>> sorted(corner)  # doctest: +SKIP
+        ['x', 'y']
     """
     if resolution is not None and level is not None:
         raise ValueError("pass either resolution= or level=, not both; they are two ways to say the same thing")
