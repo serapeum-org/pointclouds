@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 __all__ = ["bbox_mask", "build_mask"]
 
 #: The attribute dimensions :func:`build_mask` can filter on, each a membership test against the given value(s).
-_ATTRIBUTE_CRITERIA = ("classification", "return_number", "intensity")
+#: Ordered as everywhere else in the package (:data:`pointclouds.points._ATTRIBUTE_DTYPES`, ``ops.merge``).
+_ATTRIBUTE_CRITERIA = ("intensity", "classification", "return_number")
 
 
 def bbox_mask(x: np.ndarray, y: np.ndarray, bbox: tuple[float, float, float, float]) -> np.ndarray:
@@ -94,7 +95,7 @@ def build_mask(
     mask = np.ones(n, dtype=bool)
 
     for name, criterion in zip(
-        _ATTRIBUTE_CRITERIA, (classification, return_number, intensity), strict=True
+        _ATTRIBUTE_CRITERIA, (intensity, classification, return_number), strict=True
     ):
         if criterion is None:
             continue
