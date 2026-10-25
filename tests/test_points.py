@@ -198,3 +198,29 @@ def test_the_phase_0_vertical_slice(sample_laz):
     assert cloud.bounds == pytest.approx(EXPECTED_BOUNDS)
     assert cloud.count == EXPECTED_COUNT
     assert cloud.to_array(("X", "Y", "Z")).shape == (EXPECTED_COUNT, 3)
+
+
+class TestReadWindowDimensions:
+    """`PointCloud.read_window` should accept `dimensions=` like the engine, and stay coupled to the ctor (L4)."""
+
+    def test_a_dimension_subset_builds_a_cloud(self, sample_copc):
+        """Requesting a subset still yields a usable cloud - x/y/z are read even if not asked for."""
+        cloud = PointCloud.read_window(sample_copc, bbox=(155000, 463000, 155020, 463020), dimensions=("z",))
+
+        assert len(cloud) == 121
+        assert cloud.z.shape == (121,)
+        assert cloud.classification.size == 0
+
+    def test_canonical_dimensions_match_the_constructor(self):
+        """`cls(crs=crs, **arrays)` depends on CANONICAL's keys being exactly the ctor's point parameters.
+
+        If either side moves, the splat breaks at a call site; this makes it fail loudly here instead.
+        """
+        import inspect
+
+        from pointclouds.io import _records
+
+        params = set(inspect.signature(PointCloud.__init__).parameters) - {"self", "crs"}
+        assert set(_records.CANONICAL) == params, (
+            f"CANONICAL {sorted(_records.CANONICAL)} drifted from ctor params {sorted(params)}"
+        )

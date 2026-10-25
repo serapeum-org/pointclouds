@@ -175,6 +175,7 @@ class PointCloud:
         bbox: tuple[float, float, float, float] | None = None,
         resolution: float | None = None,
         level: int | range | None = None,
+        dimensions: tuple[str, ...] | None = None,
     ) -> PointCloud:
         """Read only part of a COPC cloud, using its octree instead of decompressing everything.
 
@@ -194,6 +195,10 @@ class PointCloud:
             resolution: target point spacing, in the data's units, measured against the octree's root spacing.
                 Mutually exclusive with ``level``.
             level: an exact octree level, or a ``range`` of them. Mutually exclusive with ``resolution``.
+            dimensions: which attribute arrays to carry, case-insensitive. ``None`` reads every mapped
+                dimension; ``x`` / ``y`` / ``z`` are always read whatever is asked for, since a cloud needs its
+                coordinates. See :func:`pointclouds.io.copc.read_window` - this selects what is returned, not
+                what laspy decompresses.
 
         Returns:
             A cloud holding only the selected points, with the file's CRS. A window that selects nothing gives
@@ -230,7 +235,13 @@ class PointCloud:
             >>> nothing.count  # doctest: +SKIP
             0
         """
-        crs, arrays = _copc._read_window_with_crs(source, bbox=bbox, resolution=resolution, level=level)
+        # x/y/z are forced into the request: a cloud is built from its coordinates, so a caller asking only for
+        # an attribute still needs them. The result is then splatted into the constructor, which is safe because
+        # the record contract's keys are exactly the constructor's point parameters (asserted in the tests).
+        requested = None if dimensions is None else tuple(dict.fromkeys(("x", "y", "z", *dimensions)))
+        crs, arrays = _copc._read_window_with_crs(
+            source, bbox=bbox, resolution=resolution, level=level, dimensions=requested
+        )
         return cls(crs=crs, **arrays)
 
     def load(self) -> PointCloud:
