@@ -49,7 +49,7 @@ dependencies = [
 # pyramids, and only inside a function - the `pyramids-gis` wheel vendors its
 # own osgeo bindings, and `import pyramids` is what puts them on `sys.path`.
 # Nothing here installs or pins a separate GDAL.
-gis = ["pyramids-gis >=0.63.0"]
+gis = ["pyramids-core >=0.70.0"]
 
 # Remote LAZ / COPC over HTTP and object storage.
 cloud = ["fsspec >=2024.1", "s3fs"]
