@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -2263,7 +2263,16 @@ dependency set only (numpy / laspy / pyproj / scipy) and never GDAL.</p>
 <span class="normal"><a href="#__codelineno-0-384">384</a></span>
 <span class="normal"><a href="#__codelineno-0-385">385</a></span>
 <span class="normal"><a href="#__codelineno-0-386">386</a></span>
-<span class="normal"><a href="#__codelineno-0-387">387</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-387">387</a></span>
+<span class="normal"><a href="#__codelineno-0-388">388</a></span>
+<span class="normal"><a href="#__codelineno-0-389">389</a></span>
+<span class="normal"><a href="#__codelineno-0-390">390</a></span>
+<span class="normal"><a href="#__codelineno-0-391">391</a></span>
+<span class="normal"><a href="#__codelineno-0-392">392</a></span>
+<span class="normal"><a href="#__codelineno-0-393">393</a></span>
+<span class="normal"><a href="#__codelineno-0-394">394</a></span>
+<span class="normal"><a href="#__codelineno-0-395">395</a></span>
+<span class="normal"><a href="#__codelineno-0-396">396</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
 <a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="w">    </span><span class="sd">"""In-memory point cloud: parallel per-dimension arrays plus a CRS.</span>
 <a id="__codelineno-0-43" name="__codelineno-0-43"></a>
 <a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">    The constructor builds an eager cloud from arrays already in hand. To read a file, use</span>
@@ -2589,27 +2598,36 @@ dependency set only (numpy / laspy / pyproj / scipy) and never GDAL.</p>
 <a id="__codelineno-0-364" name="__codelineno-0-364"></a>
 <a id="__codelineno-0-365" name="__codelineno-0-365"></a><span class="sd">        Raises:</span>
 <a id="__codelineno-0-366" name="__codelineno-0-366"></a><span class="sd">            KeyError: when a requested dimension is not one this container holds.</span>
-<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">        """</span>
-<a id="__codelineno-0-368" name="__codelineno-0-368"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
-<a id="__codelineno-0-369" name="__codelineno-0-369"></a>        <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
-<a id="__codelineno-0-370" name="__codelineno-0-370"></a>        <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-371" name="__codelineno-0-371"></a>            <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
-<a id="__codelineno-0-372" name="__codelineno-0-372"></a>        <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-<a id="__codelineno-0-373" name="__codelineno-0-373"></a>            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
-<a id="__codelineno-0-374" name="__codelineno-0-374"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
-<a id="__codelineno-0-375" name="__codelineno-0-375"></a>
-<a id="__codelineno-0-376" name="__codelineno-0-376"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-377" name="__codelineno-0-377"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-378" name="__codelineno-0-378"></a>
-<a id="__codelineno-0-379" name="__codelineno-0-379"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-380" name="__codelineno-0-380"></a><span class="sd">        """</span>
-<a id="__codelineno-0-381" name="__codelineno-0-381"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-<a id="__codelineno-0-382" name="__codelineno-0-382"></a>
-<a id="__codelineno-0-383" name="__codelineno-0-383"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-385" name="__codelineno-0-385"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-386" name="__codelineno-0-386"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-387" name="__codelineno-0-387"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">            ValueError: when a requested dimension is empty (the file/caller carried none of it) while others</span>
+<a id="__codelineno-0-368" name="__codelineno-0-368"></a><span class="sd">                are populated, which would otherwise surface as an opaque numpy broadcast error.</span>
+<a id="__codelineno-0-369" name="__codelineno-0-369"></a><span class="sd">        """</span>
+<a id="__codelineno-0-370" name="__codelineno-0-370"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<a id="__codelineno-0-371" name="__codelineno-0-371"></a>        <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
+<a id="__codelineno-0-372" name="__codelineno-0-372"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-373" name="__codelineno-0-373"></a>            <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
+<a id="__codelineno-0-374" name="__codelineno-0-374"></a>        <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-0-375" name="__codelineno-0-375"></a>            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+<a id="__codelineno-0-376" name="__codelineno-0-376"></a>        <span class="n">width</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">)</span>
+<a id="__codelineno-0-377" name="__codelineno-0-377"></a>        <span class="n">empty</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">col</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="n">width</span><span class="p">]</span>
+<a id="__codelineno-0-378" name="__codelineno-0-378"></a>        <span class="k">if</span> <span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-0-379" name="__codelineno-0-379"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-380" name="__codelineno-0-380"></a>                <span class="sa">f</span><span class="s2">"cannot stack dimension(s) </span><span class="si">{</span><span class="n">empty</span><span class="si">}</span><span class="s2"> - this cloud carries none of them (</span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2"> points, but "</span>
+<a id="__codelineno-0-381" name="__codelineno-0-381"></a>                <span class="sa">f</span><span class="s2">"those arrays are empty); request only the dimensions it holds"</span>
+<a id="__codelineno-0-382" name="__codelineno-0-382"></a>            <span class="p">)</span>
+<a id="__codelineno-0-383" name="__codelineno-0-383"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
+<a id="__codelineno-0-384" name="__codelineno-0-384"></a>
+<a id="__codelineno-0-385" name="__codelineno-0-385"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-386" name="__codelineno-0-386"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-387" name="__codelineno-0-387"></a>
+<a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-389" name="__codelineno-0-389"></a><span class="sd">        """</span>
+<a id="__codelineno-0-390" name="__codelineno-0-390"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<a id="__codelineno-0-391" name="__codelineno-0-391"></a>
+<a id="__codelineno-0-392" name="__codelineno-0-392"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-393" name="__codelineno-0-393"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-394" name="__codelineno-0-394"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-395" name="__codelineno-0-395"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-396" name="__codelineno-0-396"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -3185,17 +3203,17 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-376">376</a></span>
-<span class="normal"><a href="#__codelineno-0-377">377</a></span>
-<span class="normal"><a href="#__codelineno-0-378">378</a></span>
-<span class="normal"><a href="#__codelineno-0-379">379</a></span>
-<span class="normal"><a href="#__codelineno-0-380">380</a></span>
-<span class="normal"><a href="#__codelineno-0-381">381</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-376" name="__codelineno-0-376"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-377" name="__codelineno-0-377"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-378" name="__codelineno-0-378"></a>
-<a id="__codelineno-0-379" name="__codelineno-0-379"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-380" name="__codelineno-0-380"></a><span class="sd">    """</span>
-<a id="__codelineno-0-381" name="__codelineno-0-381"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-385">385</a></span>
+<span class="normal"><a href="#__codelineno-0-386">386</a></span>
+<span class="normal"><a href="#__codelineno-0-387">387</a></span>
+<span class="normal"><a href="#__codelineno-0-388">388</a></span>
+<span class="normal"><a href="#__codelineno-0-389">389</a></span>
+<span class="normal"><a href="#__codelineno-0-390">390</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-386" name="__codelineno-0-386"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-387" name="__codelineno-0-387"></a>
+<a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-389" name="__codelineno-0-389"></a><span class="sd">    """</span>
+<a id="__codelineno-0-390" name="__codelineno-0-390"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3218,15 +3236,15 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-383">383</a></span>
-<span class="normal"><a href="#__codelineno-0-384">384</a></span>
-<span class="normal"><a href="#__codelineno-0-385">385</a></span>
-<span class="normal"><a href="#__codelineno-0-386">386</a></span>
-<span class="normal"><a href="#__codelineno-0-387">387</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-383" name="__codelineno-0-383"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-385" name="__codelineno-0-385"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-386" name="__codelineno-0-386"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-387" name="__codelineno-0-387"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-392">392</a></span>
+<span class="normal"><a href="#__codelineno-0-393">393</a></span>
+<span class="normal"><a href="#__codelineno-0-394">394</a></span>
+<span class="normal"><a href="#__codelineno-0-395">395</a></span>
+<span class="normal"><a href="#__codelineno-0-396">396</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-393" name="__codelineno-0-393"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-394" name="__codelineno-0-394"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-395" name="__codelineno-0-395"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-396" name="__codelineno-0-396"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4153,6 +4171,17 @@ given.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>when a requested dimension is empty (the file/caller carried none of it) while others
+are populated, which would otherwise surface as an opaque numpy broadcast error.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -4177,7 +4206,16 @@ given.</p>
 <span class="normal"><a href="#__codelineno-0-371">371</a></span>
 <span class="normal"><a href="#__codelineno-0-372">372</a></span>
 <span class="normal"><a href="#__codelineno-0-373">373</a></span>
-<span class="normal"><a href="#__codelineno-0-374">374</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-356" name="__codelineno-0-356"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"X"</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">,</span> <span class="s2">"Z"</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-374">374</a></span>
+<span class="normal"><a href="#__codelineno-0-375">375</a></span>
+<span class="normal"><a href="#__codelineno-0-376">376</a></span>
+<span class="normal"><a href="#__codelineno-0-377">377</a></span>
+<span class="normal"><a href="#__codelineno-0-378">378</a></span>
+<span class="normal"><a href="#__codelineno-0-379">379</a></span>
+<span class="normal"><a href="#__codelineno-0-380">380</a></span>
+<span class="normal"><a href="#__codelineno-0-381">381</a></span>
+<span class="normal"><a href="#__codelineno-0-382">382</a></span>
+<span class="normal"><a href="#__codelineno-0-383">383</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-356" name="__codelineno-0-356"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"X"</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">,</span> <span class="s2">"Z"</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <a id="__codelineno-0-357" name="__codelineno-0-357"></a><span class="w">    </span><span class="sd">"""Stack the requested dimensions column-wise into an ``(N, k)`` array.</span>
 <a id="__codelineno-0-358" name="__codelineno-0-358"></a>
 <a id="__codelineno-0-359" name="__codelineno-0-359"></a><span class="sd">    Args:</span>
@@ -4188,14 +4226,23 @@ given.</p>
 <a id="__codelineno-0-364" name="__codelineno-0-364"></a>
 <a id="__codelineno-0-365" name="__codelineno-0-365"></a><span class="sd">    Raises:</span>
 <a id="__codelineno-0-366" name="__codelineno-0-366"></a><span class="sd">        KeyError: when a requested dimension is not one this container holds.</span>
-<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">    """</span>
-<a id="__codelineno-0-368" name="__codelineno-0-368"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
-<a id="__codelineno-0-369" name="__codelineno-0-369"></a>    <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
-<a id="__codelineno-0-370" name="__codelineno-0-370"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-371" name="__codelineno-0-371"></a>        <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
-<a id="__codelineno-0-372" name="__codelineno-0-372"></a>    <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-<a id="__codelineno-0-373" name="__codelineno-0-373"></a>        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
-<a id="__codelineno-0-374" name="__codelineno-0-374"></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
+<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">        ValueError: when a requested dimension is empty (the file/caller carried none of it) while others</span>
+<a id="__codelineno-0-368" name="__codelineno-0-368"></a><span class="sd">            are populated, which would otherwise surface as an opaque numpy broadcast error.</span>
+<a id="__codelineno-0-369" name="__codelineno-0-369"></a><span class="sd">    """</span>
+<a id="__codelineno-0-370" name="__codelineno-0-370"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<a id="__codelineno-0-371" name="__codelineno-0-371"></a>    <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
+<a id="__codelineno-0-372" name="__codelineno-0-372"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-373" name="__codelineno-0-373"></a>        <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
+<a id="__codelineno-0-374" name="__codelineno-0-374"></a>    <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-0-375" name="__codelineno-0-375"></a>        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+<a id="__codelineno-0-376" name="__codelineno-0-376"></a>    <span class="n">width</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">)</span>
+<a id="__codelineno-0-377" name="__codelineno-0-377"></a>    <span class="n">empty</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">col</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="n">width</span><span class="p">]</span>
+<a id="__codelineno-0-378" name="__codelineno-0-378"></a>    <span class="k">if</span> <span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-0-379" name="__codelineno-0-379"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-380" name="__codelineno-0-380"></a>            <span class="sa">f</span><span class="s2">"cannot stack dimension(s) </span><span class="si">{</span><span class="n">empty</span><span class="si">}</span><span class="s2"> - this cloud carries none of them (</span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2"> points, but "</span>
+<a id="__codelineno-0-381" name="__codelineno-0-381"></a>            <span class="sa">f</span><span class="s2">"those arrays are empty); request only the dimensions it holds"</span>
+<a id="__codelineno-0-382" name="__codelineno-0-382"></a>        <span class="p">)</span>
+<a id="__codelineno-0-383" name="__codelineno-0-383"></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4772,7 +4819,16 @@ eager and carries no header, so its <code>count</code> and <code>bounds</code> d
 <span class="normal"><a href="#__codelineno-0-384">384</a></span>
 <span class="normal"><a href="#__codelineno-0-385">385</a></span>
 <span class="normal"><a href="#__codelineno-0-386">386</a></span>
-<span class="normal"><a href="#__codelineno-0-387">387</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-387">387</a></span>
+<span class="normal"><a href="#__codelineno-0-388">388</a></span>
+<span class="normal"><a href="#__codelineno-0-389">389</a></span>
+<span class="normal"><a href="#__codelineno-0-390">390</a></span>
+<span class="normal"><a href="#__codelineno-0-391">391</a></span>
+<span class="normal"><a href="#__codelineno-0-392">392</a></span>
+<span class="normal"><a href="#__codelineno-0-393">393</a></span>
+<span class="normal"><a href="#__codelineno-0-394">394</a></span>
+<span class="normal"><a href="#__codelineno-0-395">395</a></span>
+<span class="normal"><a href="#__codelineno-0-396">396</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
 <a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="w">    </span><span class="sd">"""In-memory point cloud: parallel per-dimension arrays plus a CRS.</span>
 <a id="__codelineno-0-43" name="__codelineno-0-43"></a>
 <a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">    The constructor builds an eager cloud from arrays already in hand. To read a file, use</span>
@@ -5098,27 +5154,36 @@ eager and carries no header, so its <code>count</code> and <code>bounds</code> d
 <a id="__codelineno-0-364" name="__codelineno-0-364"></a>
 <a id="__codelineno-0-365" name="__codelineno-0-365"></a><span class="sd">        Raises:</span>
 <a id="__codelineno-0-366" name="__codelineno-0-366"></a><span class="sd">            KeyError: when a requested dimension is not one this container holds.</span>
-<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">        """</span>
-<a id="__codelineno-0-368" name="__codelineno-0-368"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
-<a id="__codelineno-0-369" name="__codelineno-0-369"></a>        <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
-<a id="__codelineno-0-370" name="__codelineno-0-370"></a>        <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-371" name="__codelineno-0-371"></a>            <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
-<a id="__codelineno-0-372" name="__codelineno-0-372"></a>        <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-<a id="__codelineno-0-373" name="__codelineno-0-373"></a>            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
-<a id="__codelineno-0-374" name="__codelineno-0-374"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
-<a id="__codelineno-0-375" name="__codelineno-0-375"></a>
-<a id="__codelineno-0-376" name="__codelineno-0-376"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-377" name="__codelineno-0-377"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-378" name="__codelineno-0-378"></a>
-<a id="__codelineno-0-379" name="__codelineno-0-379"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-380" name="__codelineno-0-380"></a><span class="sd">        """</span>
-<a id="__codelineno-0-381" name="__codelineno-0-381"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-<a id="__codelineno-0-382" name="__codelineno-0-382"></a>
-<a id="__codelineno-0-383" name="__codelineno-0-383"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-385" name="__codelineno-0-385"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-386" name="__codelineno-0-386"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-387" name="__codelineno-0-387"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">            ValueError: when a requested dimension is empty (the file/caller carried none of it) while others</span>
+<a id="__codelineno-0-368" name="__codelineno-0-368"></a><span class="sd">                are populated, which would otherwise surface as an opaque numpy broadcast error.</span>
+<a id="__codelineno-0-369" name="__codelineno-0-369"></a><span class="sd">        """</span>
+<a id="__codelineno-0-370" name="__codelineno-0-370"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<a id="__codelineno-0-371" name="__codelineno-0-371"></a>        <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
+<a id="__codelineno-0-372" name="__codelineno-0-372"></a>        <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-373" name="__codelineno-0-373"></a>            <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
+<a id="__codelineno-0-374" name="__codelineno-0-374"></a>        <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-0-375" name="__codelineno-0-375"></a>            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+<a id="__codelineno-0-376" name="__codelineno-0-376"></a>        <span class="n">width</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">)</span>
+<a id="__codelineno-0-377" name="__codelineno-0-377"></a>        <span class="n">empty</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">col</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="n">width</span><span class="p">]</span>
+<a id="__codelineno-0-378" name="__codelineno-0-378"></a>        <span class="k">if</span> <span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-0-379" name="__codelineno-0-379"></a>            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-380" name="__codelineno-0-380"></a>                <span class="sa">f</span><span class="s2">"cannot stack dimension(s) </span><span class="si">{</span><span class="n">empty</span><span class="si">}</span><span class="s2"> - this cloud carries none of them (</span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2"> points, but "</span>
+<a id="__codelineno-0-381" name="__codelineno-0-381"></a>                <span class="sa">f</span><span class="s2">"those arrays are empty); request only the dimensions it holds"</span>
+<a id="__codelineno-0-382" name="__codelineno-0-382"></a>            <span class="p">)</span>
+<a id="__codelineno-0-383" name="__codelineno-0-383"></a>        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
+<a id="__codelineno-0-384" name="__codelineno-0-384"></a>
+<a id="__codelineno-0-385" name="__codelineno-0-385"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-386" name="__codelineno-0-386"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-387" name="__codelineno-0-387"></a>
+<a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-389" name="__codelineno-0-389"></a><span class="sd">        """</span>
+<a id="__codelineno-0-390" name="__codelineno-0-390"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<a id="__codelineno-0-391" name="__codelineno-0-391"></a>
+<a id="__codelineno-0-392" name="__codelineno-0-392"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-393" name="__codelineno-0-393"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-394" name="__codelineno-0-394"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-395" name="__codelineno-0-395"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-396" name="__codelineno-0-396"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -5694,17 +5759,17 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-376">376</a></span>
-<span class="normal"><a href="#__codelineno-0-377">377</a></span>
-<span class="normal"><a href="#__codelineno-0-378">378</a></span>
-<span class="normal"><a href="#__codelineno-0-379">379</a></span>
-<span class="normal"><a href="#__codelineno-0-380">380</a></span>
-<span class="normal"><a href="#__codelineno-0-381">381</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-376" name="__codelineno-0-376"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-377" name="__codelineno-0-377"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-378" name="__codelineno-0-378"></a>
-<a id="__codelineno-0-379" name="__codelineno-0-379"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-380" name="__codelineno-0-380"></a><span class="sd">    """</span>
-<a id="__codelineno-0-381" name="__codelineno-0-381"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-385">385</a></span>
+<span class="normal"><a href="#__codelineno-0-386">386</a></span>
+<span class="normal"><a href="#__codelineno-0-387">387</a></span>
+<span class="normal"><a href="#__codelineno-0-388">388</a></span>
+<span class="normal"><a href="#__codelineno-0-389">389</a></span>
+<span class="normal"><a href="#__codelineno-0-390">390</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-386" name="__codelineno-0-386"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-387" name="__codelineno-0-387"></a>
+<a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-389" name="__codelineno-0-389"></a><span class="sd">    """</span>
+<a id="__codelineno-0-390" name="__codelineno-0-390"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5727,15 +5792,15 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-383">383</a></span>
-<span class="normal"><a href="#__codelineno-0-384">384</a></span>
-<span class="normal"><a href="#__codelineno-0-385">385</a></span>
-<span class="normal"><a href="#__codelineno-0-386">386</a></span>
-<span class="normal"><a href="#__codelineno-0-387">387</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-383" name="__codelineno-0-383"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-385" name="__codelineno-0-385"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-386" name="__codelineno-0-386"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-387" name="__codelineno-0-387"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-392">392</a></span>
+<span class="normal"><a href="#__codelineno-0-393">393</a></span>
+<span class="normal"><a href="#__codelineno-0-394">394</a></span>
+<span class="normal"><a href="#__codelineno-0-395">395</a></span>
+<span class="normal"><a href="#__codelineno-0-396">396</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-393" name="__codelineno-0-393"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-394" name="__codelineno-0-394"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-395" name="__codelineno-0-395"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-396" name="__codelineno-0-396"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6662,6 +6727,17 @@ given.</p>
               </div>
             </td>
           </tr>
+          <tr class="doc-section-item">
+            <td>
+                  <code><span title="ValueError">ValueError</span></code>
+            </td>
+            <td>
+              <div class="doc-md-description">
+                <p>when a requested dimension is empty (the file/caller carried none of it) while others
+are populated, which would otherwise surface as an opaque numpy broadcast error.</p>
+              </div>
+            </td>
+          </tr>
       </tbody>
     </table>
 
@@ -6686,7 +6762,16 @@ given.</p>
 <span class="normal"><a href="#__codelineno-0-371">371</a></span>
 <span class="normal"><a href="#__codelineno-0-372">372</a></span>
 <span class="normal"><a href="#__codelineno-0-373">373</a></span>
-<span class="normal"><a href="#__codelineno-0-374">374</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-356" name="__codelineno-0-356"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"X"</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">,</span> <span class="s2">"Z"</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-374">374</a></span>
+<span class="normal"><a href="#__codelineno-0-375">375</a></span>
+<span class="normal"><a href="#__codelineno-0-376">376</a></span>
+<span class="normal"><a href="#__codelineno-0-377">377</a></span>
+<span class="normal"><a href="#__codelineno-0-378">378</a></span>
+<span class="normal"><a href="#__codelineno-0-379">379</a></span>
+<span class="normal"><a href="#__codelineno-0-380">380</a></span>
+<span class="normal"><a href="#__codelineno-0-381">381</a></span>
+<span class="normal"><a href="#__codelineno-0-382">382</a></span>
+<span class="normal"><a href="#__codelineno-0-383">383</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-356" name="__codelineno-0-356"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_array</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"X"</span><span class="p">,</span> <span class="s2">"Y"</span><span class="p">,</span> <span class="s2">"Z"</span><span class="p">))</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
 <a id="__codelineno-0-357" name="__codelineno-0-357"></a><span class="w">    </span><span class="sd">"""Stack the requested dimensions column-wise into an ``(N, k)`` array.</span>
 <a id="__codelineno-0-358" name="__codelineno-0-358"></a>
 <a id="__codelineno-0-359" name="__codelineno-0-359"></a><span class="sd">    Args:</span>
@@ -6697,14 +6782,23 @@ given.</p>
 <a id="__codelineno-0-364" name="__codelineno-0-364"></a>
 <a id="__codelineno-0-365" name="__codelineno-0-365"></a><span class="sd">    Raises:</span>
 <a id="__codelineno-0-366" name="__codelineno-0-366"></a><span class="sd">        KeyError: when a requested dimension is not one this container holds.</span>
-<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">    """</span>
-<a id="__codelineno-0-368" name="__codelineno-0-368"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
-<a id="__codelineno-0-369" name="__codelineno-0-369"></a>    <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
-<a id="__codelineno-0-370" name="__codelineno-0-370"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-371" name="__codelineno-0-371"></a>        <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
-<a id="__codelineno-0-372" name="__codelineno-0-372"></a>    <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
-<a id="__codelineno-0-373" name="__codelineno-0-373"></a>        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
-<a id="__codelineno-0-374" name="__codelineno-0-374"></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
+<a id="__codelineno-0-367" name="__codelineno-0-367"></a><span class="sd">        ValueError: when a requested dimension is empty (the file/caller carried none of it) while others</span>
+<a id="__codelineno-0-368" name="__codelineno-0-368"></a><span class="sd">            are populated, which would otherwise surface as an opaque numpy broadcast error.</span>
+<a id="__codelineno-0-369" name="__codelineno-0-369"></a><span class="sd">    """</span>
+<a id="__codelineno-0-370" name="__codelineno-0-370"></a>    <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<a id="__codelineno-0-371" name="__codelineno-0-371"></a>    <span class="n">lookup</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"x"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">,</span> <span class="s2">"z"</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">,</span> <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="p">}</span>
+<a id="__codelineno-0-372" name="__codelineno-0-372"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-373" name="__codelineno-0-373"></a>        <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">lookup</span><span class="p">[</span><span class="n">name</span><span class="o">.</span><span class="n">lower</span><span class="p">()],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">dimensions</span><span class="p">]</span>
+<a id="__codelineno-0-374" name="__codelineno-0-374"></a>    <span class="k">except</span> <span class="ne">KeyError</span> <span class="k">as</span> <span class="n">exc</span><span class="p">:</span>
+<a id="__codelineno-0-375" name="__codelineno-0-375"></a>        <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"unknown dimension </span><span class="si">{</span><span class="n">exc</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">!r}</span><span class="s2">; this cloud holds </span><span class="si">{</span><span class="nb">sorted</span><span class="p">(</span><span class="n">lookup</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="kc">None</span>
+<a id="__codelineno-0-376" name="__codelineno-0-376"></a>    <span class="n">width</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">)</span>
+<a id="__codelineno-0-377" name="__codelineno-0-377"></a>    <span class="n">empty</span> <span class="o">=</span> <span class="p">[</span><span class="n">name</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">dimensions</span><span class="p">,</span> <span class="n">cols</span><span class="p">)</span> <span class="k">if</span> <span class="n">col</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="n">width</span><span class="p">]</span>
+<a id="__codelineno-0-378" name="__codelineno-0-378"></a>    <span class="k">if</span> <span class="n">empty</span><span class="p">:</span>
+<a id="__codelineno-0-379" name="__codelineno-0-379"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+<a id="__codelineno-0-380" name="__codelineno-0-380"></a>            <span class="sa">f</span><span class="s2">"cannot stack dimension(s) </span><span class="si">{</span><span class="n">empty</span><span class="si">}</span><span class="s2"> - this cloud carries none of them (</span><span class="si">{</span><span class="n">width</span><span class="si">}</span><span class="s2"> points, but "</span>
+<a id="__codelineno-0-381" name="__codelineno-0-381"></a>            <span class="sa">f</span><span class="s2">"those arrays are empty); request only the dimensions it holds"</span>
+<a id="__codelineno-0-382" name="__codelineno-0-382"></a>        <span class="p">)</span>
+<a id="__codelineno-0-383" name="__codelineno-0-383"></a>    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span><span class="n">cols</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
