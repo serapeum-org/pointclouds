@@ -306,7 +306,7 @@ class TestRejections:
     @pytest.mark.parametrize("resolution", [0.0, -1.0])
     def test_resolution_must_be_positive(self, sample_copc, resolution):
         """A zero or negative spacing has no meaning as a target resolution."""
-        with pytest.raises(ValueError, match="resolution must be positive"):
+        with pytest.raises(ValueError, match="resolution must be"):
             copc.read_window(sample_copc, resolution=resolution)
 
     def test_a_negative_level_is_refused(self, sample_copc):
@@ -634,3 +634,34 @@ class TestSingleOpen:
         assert container_io.reads <= engine_io.reads, (
             f"container did {container_io.reads} reads vs the engine's {engine_io.reads} - it re-opened the file"
         )
+
+
+class TestLevelResolutionValidation:
+    """`level` / `resolution` must be validated up front, not leak laspy internals (M6, N1, L3)."""
+
+    @pytest.mark.parametrize("level", [1.0, -0.5])
+    def test_a_non_integer_level_is_refused(self, sample_copc, level):
+        """A float level leaks `AttributeError: 'float' object has no attribute 'stop'` from laspy otherwise."""
+        with pytest.raises(ValueError, match="level must be"):
+            copc.read_window(sample_copc, level=level)
+
+    def test_a_boolean_level_is_refused(self, sample_copc):
+        """`True` is an int subclass that laspy would silently read as level 1 - reject it as not a level."""
+        with pytest.raises(ValueError, match="level must be"):
+            copc.read_window(sample_copc, level=True)
+
+    def test_a_range_with_a_negative_start_is_refused(self, sample_copc):
+        """A negative start is the same mistake as a negative int level; reject it the same way."""
+        with pytest.raises(ValueError, match="level"):
+            copc.read_window(sample_copc, level=range(-1, 2))
+
+    def test_an_empty_range_is_refused(self, sample_copc):
+        """An inverted/empty range selects nothing; reject it as the inverted bbox is rejected (L3)."""
+        with pytest.raises(ValueError, match="empty"):
+            copc.read_window(sample_copc, level=range(5, 2))
+
+    @pytest.mark.parametrize("resolution", [float("nan"), float("inf")])
+    def test_a_non_finite_resolution_is_refused(self, sample_copc, resolution):
+        """`nan`/`inf` pass `resolution <= 0` and then leak a laspy/lazrs conversion error."""
+        with pytest.raises(ValueError, match="resolution must be"):
+            copc.read_window(sample_copc, resolution=resolution)

@@ -394,8 +394,10 @@ def read_window(
     Raises:
         FileNotFoundError: when a path does not exist.
         ValueError: when a path's suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is
-            malformed; when ``resolution`` is not positive; when ``level`` is negative; or when ``resolution``
-            and ``level`` are both given.
+            malformed, non-finite or inverted; when ``resolution`` is not a positive finite number; when
+            ``level`` is not a non-negative ``int`` or ``range`` of octree levels (a ``bool``, a float, a
+            negative level, or an empty range are all rejected); or when ``resolution`` and ``level`` are both
+            given.
         KeyError: when a requested dimension is not one this package reads.
 
     Examples:
@@ -428,6 +430,35 @@ def read_window(
         return _query_window(reader, bbox=bbox, resolution=resolution, level=level, dimensions=dimensions)
 
 
+def _validate_level(level: int | range | None) -> None:
+    """Reject a ``level`` laspy would mishandle or silently misread, before it reaches the query.
+
+    laspy does ``level.stop`` for a non-``int`` and turns a bare ``True`` into ``range(1, 2)``, so a float leaks
+    an ``AttributeError`` and a bool passes unnoticed. An inverted/empty ``range`` selects nothing, the same
+    mistake the inverted-``bbox`` guard rejects.
+
+    Args:
+        level: the ``level`` argument to :func:`read_window`, before use.
+
+    Raises:
+        ValueError: when ``level`` is a ``bool``, a non-``int``/``range`` type, a negative ``int``, a ``range``
+            with a negative start, or an empty ``range``.
+    """
+    if level is None:
+        return
+    # bool is an int subclass; True would silently mean range(1, 2), so exclude it explicitly.
+    if isinstance(level, bool) or not isinstance(level, (int, range)):
+        raise ValueError(f"level must be a non-negative int or a range of octree levels; got {level!r}")
+    if isinstance(level, int):
+        if level < 0:
+            raise ValueError(f"level must be a non-negative octree level; got {level!r}")
+        return
+    if level.start < 0:
+        raise ValueError(f"level range must start at a non-negative octree level; got {level!r}")
+    if len(level) == 0:
+        raise ValueError(f"level range is empty, so it selects nothing; got {level!r}")
+
+
 def _query_window(
     reader: laspy.CopcReader,
     *,
@@ -453,10 +484,10 @@ def _query_window(
     """
     if resolution is not None and level is not None:
         raise ValueError("pass either resolution= or level=, not both; they are two ways to say the same thing")
-    if resolution is not None and resolution <= 0:
-        raise ValueError(f"resolution must be positive; got {resolution!r}")
-    if isinstance(level, int) and level < 0:
-        raise ValueError(f"level must be a non-negative octree level; got {level!r}")
+    if resolution is not None and not (math.isfinite(resolution) and resolution > 0):
+        # nan and inf both slip a bare `resolution <= 0` and then leak a laspy/lazrs conversion error.
+        raise ValueError(f"resolution must be a positive, finite number; got {resolution!r}")
+    _validate_level(level)
 
     requested = _records.resolve(dimensions)
     # An exact bbox clip needs x and y even when the caller did not ask for them; read them, then drop them
