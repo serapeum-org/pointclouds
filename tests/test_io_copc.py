@@ -111,6 +111,11 @@ class TestIsCopc:
         with pytest.raises(ValueError, match="COPC is always LAZ-compressed"):
             copc.is_copc(sample_las)
 
+    def test_a_file_object_can_be_asked_too(self, sample_copc, sample_laz):
+        """A handle has no suffix to judge by, so the answer has to come from the bytes."""
+        assert copc.is_copc(io.BytesIO(sample_copc.read_bytes())) is True
+        assert copc.is_copc(io.BytesIO(sample_laz.read_bytes())) is False
+
 
 class TestBoundingBoxWindow:
     """`bbox=` reads a sub-box by pruning the octree to the chunks that overlap it."""
@@ -172,6 +177,19 @@ class TestBoundingBoxWindow:
         assert set(arrays) == {"x", "z"}
         assert arrays["z"].shape == (CORNER_COUNT,)
 
+    def test_a_degenerate_box_is_accepted(self, sample_copc):
+        """A zero-width box is a point query, not an inverted box - it must not be refused.
+
+        The fixture is a 2 m grid with a point exactly on the corner, so collapsing the box onto that corner
+        selects it rather than returning nothing.
+        """
+        xmin, ymin, _, _ = CORNER_BBOX
+
+        arrays = copc.read_window(sample_copc, bbox=(xmin, ymin, xmin, ymin))
+
+        assert arrays["x"].size == 1
+        assert arrays["x"][0] == pytest.approx(xmin)
+
 
 class TestResolutionAndLevel:
     """`resolution=` and `level=` are the level-of-detail half of a window."""
@@ -229,6 +247,15 @@ class TestResolutionAndLevel:
 
         whole_file, coarse = visited
         assert coarse < whole_file
+
+    def test_a_resolution_coarser_than_the_root_still_reads_the_root(self, sample_copc):
+        """There is no level above the root, so an absurdly coarse ask returns the root, never nothing.
+
+        A caller zoomed far out should get a cheap cloud, not an empty one.
+        """
+        arrays = copc.read_window(sample_copc, resolution=10_000.0)
+
+        assert arrays["x"].size == ROOT_COUNT
 
     def test_a_box_and_a_resolution_compose(self, sample_copc):
         """The two halves of a window are independent, so they can be asked for together."""
@@ -324,6 +351,35 @@ class TestFileObjectSource:
         assert copc.read_header(handle).count == EXPECTED_COUNT
         assert copc.read_window(handle, bbox=CORNER_BBOX)["x"].size == CORNER_COUNT
         assert copc.read_header(handle).count == EXPECTED_COUNT
+
+
+class TestTheFixtureItself:
+    """The generator and the committed fixture have to stay in step.
+
+    Every count asserted in this module comes from the committed file, so if `make_copc_sample.py` stops
+    producing a readable COPC - a laspy change to header writing, say - that should surface here rather than
+    the next time someone regenerates the fixture and finds the suite broken.
+    """
+
+    def test_the_generator_still_produces_a_readable_copc(self, tmp_path, data_dir, monkeypatch):
+        """Regenerating the fixture yields a file this engine reads, with the same shape as the committed one.
+
+        Byte equality is deliberately not asserted: laspy controls the header layout, so a patch release could
+        shift bytes without breaking anything that matters here.
+        """
+        monkeypatch.syspath_prepend(str(data_dir))  # the generator imports its sibling make_sample
+        make_copc_sample = pytest.importorskip("make_copc_sample")
+
+        regenerated = tmp_path / "sample.copc.laz"
+        written = make_copc_sample.write(regenerated)
+
+        assert written == EXPECTED_COUNT
+        info = copc.read_header(regenerated)
+        assert info.count == EXPECTED_COUNT
+        assert info.bounds == pytest.approx(EXPECTED_BOUNDS)
+        assert info.spacing == pytest.approx(EXPECTED_SPACING)
+        assert copc.read_window(regenerated, level=0)["x"].size == ROOT_COUNT
+        assert copc.read_window(regenerated, bbox=CORNER_BBOX)["x"].size == CORNER_COUNT
 
 
 class TestPointCloudWindow:

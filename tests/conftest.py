@@ -16,6 +16,12 @@ _DATA = _ROOT / "examples" / "data"
 
 
 @pytest.fixture
+def data_dir() -> Path:
+    """The committed example data directory, for tests that need the fixture generators next to it."""
+    return _DATA
+
+
+@pytest.fixture
 def tiny_cloud() -> PointCloud:
     """A four-point cloud with classification, for core-path tests."""
     return PointCloud(
