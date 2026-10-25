@@ -74,7 +74,11 @@ def resolve(dimensions: tuple[str, ...] | None) -> tuple[str, ...]:
         KeyError: "unknown dimension(s) ['gps_time']; this engine reads ['classification', 'intensity', \
 'return_number', 'x', 'y', 'z']"
     """
-    requested = tuple(CANONICAL) if dimensions is None else tuple(name.lower() for name in dimensions)
+    if dimensions is None:
+        return tuple(CANONICAL)
+    # Lower-case and de-duplicate, preserving first-seen order, so ("Z", "z") - or an upstream forced x/y/z that
+    # overlaps the request - does not carry a repeated name into the record contract.
+    requested = tuple(dict.fromkeys(name.lower() for name in dimensions))
     unknown = [name for name in requested if name not in CANONICAL]
     if unknown:
         raise KeyError(f"unknown dimension(s) {unknown}; this engine reads {sorted(CANONICAL)}")

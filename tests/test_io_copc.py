@@ -671,3 +671,47 @@ class TestLevelResolutionValidation:
         """`nan`/`inf` pass `resolution <= 0` and then leak a laspy/lazrs conversion error."""
         with pytest.raises(ValueError, match="resolution must be"):
             copc.read_window(sample_copc, resolution=resolution)
+
+
+class TestValidationBeforeOpen:
+    """Header-independent window validation must run before the source is opened (L2)."""
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"bbox": (1.0, 2.0, 3.0)},
+            {"bbox": (float("nan"), 0.0, 1.0, 1.0)},
+            {"bbox": (10.0, 10.0, 0.0, 20.0)},
+            {"resolution": -5.0},
+            {"resolution": float("inf")},
+            {"level": 1.0},
+            {"level": range(5, 2)},
+            {"resolution": 1.0, "level": 1},
+            {"dimensions": ("nosuchdim",)},
+        ],
+    )
+    def test_a_bad_argument_is_rejected_without_a_single_read(self, sample_copc, kwargs):
+        """An invalid window pays no I/O - on a remote handle the open is the round-trip worth avoiding."""
+        counting = _CountingBytesIO(sample_copc.read_bytes())
+
+        with pytest.raises((ValueError, KeyError)):
+            copc.read_window(counting, **kwargs)
+
+        assert counting.reads == 0, f"{kwargs} opened the file ({counting.reads} reads) before rejecting"
+        assert counting.seeks == 0, f"{kwargs} seeked the file before rejecting"
+
+
+class TestInclusiveEdges:
+    """The bbox edges are inclusive; adjacent tiles share their boundary column (M1, documented behaviour)."""
+
+    def test_two_adjacent_windows_both_include_the_shared_edge(self, sample_copc):
+        """A point on a shared edge is returned by both neighbours - the docstring now states this, not the
+        opposite. A caller tiling the plane must use half-open boxes itself.
+        """
+        left = copc.read_window(sample_copc, bbox=(155000.0, 463000.0, 155020.0, 463078.0))
+        right = copc.read_window(sample_copc, bbox=(155020.0, 463000.0, 155078.0, 463078.0))
+
+        on_edge_left = (left["x"] == 155020.0).sum()
+        on_edge_right = (right["x"] == 155020.0).sum()
+        assert on_edge_left > 0 and on_edge_right > 0, "the shared edge should appear in both windows"
+        assert on_edge_left == on_edge_right, "both windows should see the same shared-edge column"

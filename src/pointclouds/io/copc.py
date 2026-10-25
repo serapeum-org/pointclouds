@@ -211,6 +211,11 @@ def _reader(source: Source) -> Iterator[laspy.CopcReader]:
         # Only laspy's "not a valid COPC" means the file genuinely has no octree. Any other LaspyException is a
         # structural read failure (e.g. a truncated file) and must not be relabelled into a misdirecting
         # "read it whole instead" - that path would fail too.
+        #
+        # This matches an unversioned laspy-internal string (observed on laspy 2.7.0:
+        # "This file is not a valid COPC, it does not have a COPC VLR"). The coupling is deliberate and
+        # test-guarded: test_a_plain_laz_is_not / test_a_genuine_non_copc_still_says_so run against a real
+        # plain LAZ, so a laspy rewording fails the suite loudly rather than silently leaking a raw exception.
         if "not a valid COPC" not in str(exc):
             raise
         label = resolved.name if isinstance(resolved, Path) else "the given file object"
@@ -257,7 +262,10 @@ def is_copc(source: Source) -> bool:
         >>> read_window(path, bbox=(0, 0, 1, 1)) if is_copc(path) else "read it whole instead"  # doctest: +SKIP
         'read it whole instead'
     """
-    resolved = _resolve(source)  # a bad suffix or a missing file is an error, not a "no" answer
+    # Resolve FIRST, outside the try: a bad suffix or a missing file is an error, not a "no" answer, and both
+    # raise ValueError - which the `except ValueError` below would otherwise swallow into a wrong False. This
+    # call is load-bearing, not redundant with the one inside _reader; do not remove it.
+    resolved = _resolve(source)
     try:
         with _reader(resolved):
             return True
@@ -304,23 +312,11 @@ def read_header(source: Source) -> CopcHeaderInfo:
         )
 
 
-def _as_bounds(bbox: tuple[float, float, float, float], header: laspy.LasHeader) -> Bounds:
-    """Turn a 2-D bounding box into the laspy ``Bounds`` the octree query takes, clamped to the file.
-
-    The box stays 2-D on purpose: laspy extends it over the file's full z range before querying, so no point is
-    ever dropped for its elevation. Filtering in z is a cloud operation, not a read window.
-
-    The box is clamped to the file's own x/y extent before it reaches laspy. laspy clips in scaled ``int32``
-    space (``np.round((mins - offset) / scale)``), which overflows for coordinates past roughly ``±2.1e7`` at a
-    centimetre scale and silently returns zero points. Clamping first means a generously large or sentinel box
-    reads the whole cloud, which is what "give me everything in this area" has to mean.
+def _check_bbox(bbox: tuple[float, float, float, float]) -> None:
+    """Validate a bounding box's shape, finiteness and orientation. Needs no file, so it runs before any open.
 
     Args:
         bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS.
-        header: the open file's header, read for its ``x_min`` / ``y_min`` / ``x_max`` / ``y_max`` extent.
-
-    Returns:
-        The equivalent :class:`laspy.copc.Bounds`, clamped to the file's extent.
 
     Raises:
         ValueError: when ``bbox`` is not four numbers, holds a non-finite value, or either axis is inverted.
@@ -333,6 +329,30 @@ def _as_bounds(bbox: tuple[float, float, float, float], header: laspy.LasHeader)
         raise ValueError(f"bbox corners must be finite; got (xmin, ymin, xmax, ymax) = {(xmin, ymin, xmax, ymax)!r}")
     if xmin > xmax or ymin > ymax:
         raise ValueError(f"bbox is inverted: (xmin, ymin, xmax, ymax) = {(xmin, ymin, xmax, ymax)!r}")
+
+
+def _as_bounds(bbox: tuple[float, float, float, float], header: laspy.LasHeader) -> Bounds:
+    """Turn a validated 2-D bounding box into the laspy ``Bounds`` the octree query takes, clamped to the file.
+
+    The box stays 2-D on purpose: laspy extends it over the file's full z range before querying, so no point is
+    ever dropped for its elevation. Filtering in z is a cloud operation, not a read window.
+
+    The box is clamped to the file's own x/y extent. laspy clips in scaled ``int32`` space
+    (``np.round((mins - offset) / scale)``), which overflows for coordinates past roughly ``±2.1e7`` at a
+    centimetre scale and silently returns zero points. Clamping first means a generously large or sentinel box
+    reads the whole cloud, which is what "give me everything in this area" has to mean.
+
+    ``bbox`` is assumed already validated by :func:`_check_bbox` (that check needs no header, so it runs before
+    the file is opened); this one needs the header's extent, so it runs after.
+
+    Args:
+        bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS, already checked.
+        header: the open file's header, read for its ``x_min`` / ``y_min`` / ``x_max`` / ``y_max`` extent.
+
+    Returns:
+        The equivalent :class:`laspy.copc.Bounds`, clamped to the file's extent.
+    """
+    xmin, ymin, xmax, ymax = (float(value) for value in bbox)
     return Bounds(
         mins=np.array([max(xmin, header.x_min), max(ymin, header.y_min)]),
         maxs=np.array([min(xmax, header.x_max), min(ymax, header.y_max)]),
@@ -344,8 +364,13 @@ def _clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float,
 
     laspy rounds the box edges to the file's coordinate scale before clipping, so its result can include points
     up to half a scale unit outside the requested box - a whole boundary row, when an edge falls between grid
-    lines. This re-applies the box as an exact float mask so adjacent, non-overlapping windows never both claim
-    a boundary point. The arrays are already in memory, so the mask is cheap.
+    lines. This re-applies the box as an exact float mask, so the result matches the requested box to the float
+    edge rather than to the file's scale. The arrays are already in memory, so the mask is cheap.
+
+    **Both edges are inclusive** (``xmin <= x <= xmax``), so a point exactly on a boundary is kept - which is
+    what a zero-width point-query box needs. The consequence for tiling: two windows that share an edge each
+    include the points on that shared edge, so a caller stitching adjacent tiles must make its own boxes
+    half-open (or de-duplicate) to avoid counting the boundary twice.
 
     Args:
         arrays: the mapping from :func:`pointclouds.io._records.extract`; must contain ``x`` and ``y``.
@@ -432,8 +457,9 @@ def read_window(
         >>> sorted(corner)  # doctest: +SKIP
         ['x', 'y']
     """
+    requested = _validate_window(bbox, resolution, level, dimensions)  # before the open: no I/O on bad input
     with _reader(source) as reader:
-        return _query_window(reader, bbox=bbox, resolution=resolution, level=level, dimensions=dimensions)
+        return _query_window(reader, bbox=bbox, resolution=resolution, level=level, requested=requested)
 
 
 def _validate_level(level: int | range | None) -> None:
@@ -465,28 +491,29 @@ def _validate_level(level: int | range | None) -> None:
         raise ValueError(f"level range is empty, so it selects nothing; got {level!r}")
 
 
-def _query_window(
-    reader: laspy.CopcReader,
-    *,
+def _validate_window(
     bbox: tuple[float, float, float, float] | None,
     resolution: float | None,
     level: int | range | None,
     dimensions: tuple[str, ...] | None,
-) -> dict[str, np.ndarray]:
-    """Run one octree query on an already-open reader and return the record arrays.
+) -> tuple[str, ...]:
+    """Run every header-independent window check and resolve the dimension list, before any file is opened.
 
-    Split out of :func:`read_window` so the one open can be shared: :func:`_read_window_with_crs` reads the CRS
-    and the window from the same reader rather than opening the source twice.
+    None of these needs the file, so running them here lets a malformed window be rejected before paying the
+    open - on a remote source, the open is a header parse plus a hierarchy fetch worth avoiding.
 
     Args:
-        reader: an open :class:`laspy.CopcReader`.
         bbox: see :func:`read_window`.
         resolution: see :func:`read_window`.
         level: see :func:`read_window`.
         dimensions: see :func:`read_window`.
 
     Returns:
-        The record-array mapping, as :func:`read_window` documents.
+        The resolved, lower-cased, de-duplicated dimension names (see :func:`pointclouds.io._records.resolve`).
+
+    Raises:
+        ValueError: on a bad bbox, resolution, level, or both resolution and level.
+        KeyError: when a requested dimension is not one this package reads.
     """
     if resolution is not None and level is not None:
         raise ValueError("pass either resolution= or level=, not both; they are two ways to say the same thing")
@@ -494,8 +521,35 @@ def _query_window(
         # nan and inf both slip a bare `resolution <= 0` and then leak a laspy/lazrs conversion error.
         raise ValueError(f"resolution must be a positive, finite number; got {resolution!r}")
     _validate_level(level)
+    if bbox is not None:
+        _check_bbox(bbox)
+    return _records.resolve(dimensions)
 
-    requested = _records.resolve(dimensions)
+
+def _query_window(
+    reader: laspy.CopcReader,
+    *,
+    bbox: tuple[float, float, float, float] | None,
+    resolution: float | None,
+    level: int | range | None,
+    requested: tuple[str, ...],
+) -> dict[str, np.ndarray]:
+    """Run one octree query on an already-open reader and return the record arrays.
+
+    Split out of :func:`read_window` so the one open can be shared: :func:`_read_window_with_crs` reads the CRS
+    and the window from the same reader rather than opening the source twice. The arguments are assumed already
+    validated by :func:`_validate_window`, which runs before the open.
+
+    Args:
+        reader: an open :class:`laspy.CopcReader`.
+        bbox: see :func:`read_window`.
+        resolution: see :func:`read_window`.
+        level: see :func:`read_window`.
+        requested: the resolved dimension names from :func:`_validate_window`.
+
+    Returns:
+        The record-array mapping, as :func:`read_window` documents.
+    """
     # An exact bbox clip needs x and y even when the caller did not ask for them; read them, then drop them
     # again if they were not requested.
     needed = requested if bbox is None else tuple(dict.fromkeys(("x", "y", *requested)))
@@ -532,7 +586,8 @@ def _read_window_with_crs(
     Returns:
         ``(crs, arrays)`` - the file's CRS (or ``None``) and the record-array mapping.
     """
+    requested = _validate_window(bbox, resolution, level, dimensions)  # before the open: no I/O on bad input
     with _reader(source) as reader:
         crs = reader.header.parse_crs()
-        arrays = _query_window(reader, bbox=bbox, resolution=resolution, level=level, dimensions=dimensions)
+        arrays = _query_window(reader, bbox=bbox, resolution=resolution, level=level, requested=requested)
         return crs, arrays
