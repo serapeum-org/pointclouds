@@ -308,15 +308,39 @@ class TestToCrs:
         with pytest.raises(pyproj.exceptions.ProjError):
             cloud.to_crs("EPSG:32601")
 
-    def test_result_does_not_alias_the_source_arrays(self):
-        """The returned cloud owns independent z and attribute arrays; editing it never touches the source (M2)."""
-        cloud = PointCloud(
-            x=np.array([155000.0, 155038.0]),
-            y=np.array([463000.0, 463038.0]),
+    def _full_cloud(self, crs: str) -> PointCloud:
+        """A two-point cloud carrying every attribute array, in the given CRS."""
+        return PointCloud(
+            x=np.array([5.0, 6.0]),
+            y=np.array([52.0, 53.0]),
             z=np.array([1.0, 2.0]),
+            intensity=np.array([10, 20], dtype=np.uint16),
             classification=np.array([2, 5], dtype=np.uint8),
-            crs="EPSG:28992",
+            return_number=np.array([1, 2], dtype=np.uint8),
+            crs=crs,
         )
+
+    def test_result_does_not_alias_any_source_array_horizontal(self):
+        """Every one of the six result arrays is independent of the source on the horizontal path (M2)."""
+        cloud = self._full_cloud("EPSG:4326")
+
+        out = cloud.to_crs("EPSG:32631")
+
+        for name in ("x", "y", "z", "intensity", "classification", "return_number"):
+            assert not np.shares_memory(getattr(out, name), getattr(cloud, name)), f"{name} must be independent"
+
+    def test_result_does_not_alias_any_source_array_vertical(self):
+        """Every one of the six result arrays is independent of the source on the vertical path too (M2/L2)."""
+        cloud = self._full_cloud("EPSG:4979")
+
+        out = cloud.to_crs("EPSG:4978", vertical=True)
+
+        for name in ("x", "y", "z", "intensity", "classification", "return_number"):
+            assert not np.shares_memory(getattr(out, name), getattr(cloud, name)), f"{name} must be independent"
+
+    def test_editing_the_result_never_touches_the_source(self):
+        """Mutating the returned cloud's arrays in place leaves the source cloud untouched (M2)."""
+        cloud = self._full_cloud("EPSG:4326")
 
         out = cloud.to_crs("EPSG:32631")
         out.z[0] = -999.0
@@ -324,8 +348,15 @@ class TestToCrs:
 
         assert cloud.z[0] == 1.0, "mutating the result's z must not reach back into the source"
         assert cloud.classification[0] == 2, "mutating the result's attributes must not reach the source"
-        assert not np.shares_memory(out.z, cloud.z), "z must be an independent array"
-        assert not np.shares_memory(out.classification, cloud.classification), "attributes must be independent"
+
+    def test_one_out_of_domain_point_aborts_the_whole_batch(self):
+        """errcheck is all-or-nothing: a single bad point raises and no partial result is returned (M1)."""
+        import pyproj
+
+        cloud = PointCloud(x=np.array([3.0, 200.0]), y=np.array([52.0, 95.0]), z=np.zeros(2), crs="EPSG:4326")
+
+        with pytest.raises(pyproj.exceptions.ProjError):
+            cloud.to_crs("EPSG:32601")
 
     def test_reprojects_an_empty_cloud(self):
         """A zero-point cloud reprojects to a zero-point cloud in the target CRS, with nothing to transform."""
@@ -335,6 +366,15 @@ class TestToCrs:
 
         assert len(out) == 0, "an empty cloud stays empty"
         assert out.crs.to_epsg() == 32631, "the target CRS is still set on an empty cloud"
+
+    def test_reprojects_an_empty_cloud_on_the_vertical_path(self):
+        """The vertical path also handles a zero-point cloud: nothing to transform, target CRS still set (L2)."""
+        cloud = PointCloud(x=np.empty(0), y=np.empty(0), z=np.empty(0), crs="EPSG:4979")
+
+        out = cloud.to_crs("EPSG:4978", vertical=True)
+
+        assert len(out) == 0, "an empty cloud stays empty on the vertical path"
+        assert out.crs.to_epsg() == 4978, "the target CRS is still set on an empty vertical reprojection"
 
     def test_accepts_an_int_epsg_code(self):
         """The target may be given as an int EPSG code, matching what `pyproj.CRS.from_user_input` accepts (N1)."""

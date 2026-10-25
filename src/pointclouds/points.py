@@ -266,18 +266,22 @@ class PointCloud:
         horizontal CRS - there is no vertical transformation to apply - but it means a 3-D reprojection is never
         done implicitly. To shift z as well, pass ``vertical=True``; this requires a compound or 3-D CRS on both
         sides (one that carries a vertical axis) and raises ``ValueError`` otherwise. The transform is then built
-        with ``only_best=True`` and run with ``errcheck=True``, so if the required vertical operation (e.g. a
-        geoid grid) is unavailable pyproj raises rather than falling back to an operation that passes z through -
-        z is never silently left in the source datum when a vertical transform was asked for but is impossible.
+        with ``only_best=True``: only the single most-accurate vertical operation is used, so if its grid (e.g. a
+        geoid model) is unavailable pyproj raises rather than falling back to a less-accurate operation or to one
+        that passes z through untouched. The trade-off is strict - a legitimate vertical reprojection is refused
+        on an install lacking that grid - but it guarantees z is never silently left in the source datum when a
+        vertical transform was asked for.
 
         Out-of-domain points are an error, not a silent ``inf``: the transform runs with ``errcheck=True``, so a
-        coordinate outside the transform's area of use raises instead of poisoning the result with non-finite
-        values.
+        coordinate outside the transform's area of use raises ``ProjError``. This is all-or-nothing - a single
+        non-computable point aborts the whole reprojection, returning no partial result - so a cloud that may
+        carry sentinel or noise coordinates (e.g. stray ``0, 0``) should be filtered before calling.
 
-        Attribute arrays (intensity, classification, return number) are carried over by value - the returned
-        cloud owns independent copies, so editing it never reaches back into the source - and stay aligned with
-        the reprojected coordinates. The whole cloud is materialised: a lazy source is loaded first, and the cost
-        is O(N) in points, with no chunked/streaming path.
+        Present attribute arrays (intensity, classification, return number) are carried over by value - the
+        returned cloud owns independent copies, so editing it never reaches back into the source - and stay
+        aligned with the reprojected coordinates; an absent attribute is carried over as the same empty array. The
+        whole cloud is materialised: a lazy source is loaded first, and the cost is O(N) in points, with no
+        chunked/streaming path.
 
         Args:
             crs: the target CRS, as anything :class:`pyproj.CRS` accepts (an int or string EPSG code, WKT, a
