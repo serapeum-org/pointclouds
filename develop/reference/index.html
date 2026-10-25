@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -7871,12 +7871,7 @@ question it could not evaluate, so a backend failure surfaces rather than being 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/io/copc.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-225">225</a></span>
-<span class="normal"><a href="#__codelineno-0-226">226</a></span>
-<span class="normal"><a href="#__codelineno-0-227">227</a></span>
-<span class="normal"><a href="#__codelineno-0-228">228</a></span>
-<span class="normal"><a href="#__codelineno-0-229">229</a></span>
-<span class="normal"><a href="#__codelineno-0-230">230</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-230">230</a></span>
 <span class="normal"><a href="#__codelineno-0-231">231</a></span>
 <span class="normal"><a href="#__codelineno-0-232">232</a></span>
 <span class="normal"><a href="#__codelineno-0-233">233</a></span>
@@ -7911,47 +7906,58 @@ question it could not evaluate, so a backend failure surfaces rather than being 
 <span class="normal"><a href="#__codelineno-0-262">262</a></span>
 <span class="normal"><a href="#__codelineno-0-263">263</a></span>
 <span class="normal"><a href="#__codelineno-0-264">264</a></span>
-<span class="normal"><a href="#__codelineno-0-265">265</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-225" name="__codelineno-0-225"></a><span class="k">def</span><span class="w"> </span><span class="nf">is_copc</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<a id="__codelineno-0-226" name="__codelineno-0-226"></a><span class="w">    </span><span class="sd">"""Report whether ``source`` carries a COPC octree.</span>
-<a id="__codelineno-0-227" name="__codelineno-0-227"></a>
-<a id="__codelineno-0-228" name="__codelineno-0-228"></a><span class="sd">    This is the cheap question: it reads the header, the VLRs and the octree's root hierarchy page, never a</span>
-<a id="__codelineno-0-229" name="__codelineno-0-229"></a><span class="sd">    point record. On a remote source that is two range requests, not one - the root page sits past the point</span>
-<a id="__codelineno-0-230" name="__codelineno-0-230"></a><span class="sd">    data.</span>
-<a id="__codelineno-0-231" name="__codelineno-0-231"></a>
-<a id="__codelineno-0-232" name="__codelineno-0-232"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-233" name="__codelineno-0-233"></a><span class="sd">        source: the file to inspect, as a path or an open file object.</span>
-<a id="__codelineno-0-234" name="__codelineno-0-234"></a>
-<a id="__codelineno-0-235" name="__codelineno-0-235"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-236" name="__codelineno-0-236"></a><span class="sd">        ``True`` when the file is a valid COPC, ``False`` when it is a plain LAS/LAZ with no octree.</span>
-<a id="__codelineno-0-237" name="__codelineno-0-237"></a>
-<a id="__codelineno-0-238" name="__codelineno-0-238"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-239" name="__codelineno-0-239"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
-<a id="__codelineno-0-240" name="__codelineno-0-240"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz`` - an uncompressed ``.las`` is never COPC.</span>
-<a id="__codelineno-0-241" name="__codelineno-0-241"></a><span class="sd">        laspy.errors.LazError: when the ``lazrs`` backend is missing. A predicate must not answer ``False`` to a</span>
-<a id="__codelineno-0-242" name="__codelineno-0-242"></a><span class="sd">            question it could not evaluate, so a backend failure surfaces rather than being swallowed.</span>
-<a id="__codelineno-0-243" name="__codelineno-0-243"></a><span class="sd">        laspy.errors.LaspyException: when the file is structurally broken (truncated or corrupt) - distinct from</span>
-<a id="__codelineno-0-244" name="__codelineno-0-244"></a><span class="sd">            "a valid file with no octree", which is the only case that returns ``False``.</span>
-<a id="__codelineno-0-245" name="__codelineno-0-245"></a>
-<a id="__codelineno-0-246" name="__codelineno-0-246"></a><span class="sd">    Examples:</span>
-<a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="sd">        An indexed cloud answers yes, and a plain LAZ answers no rather than raising - that is the question:</span>
-<a id="__codelineno-0-248" name="__codelineno-0-248"></a>
-<a id="__codelineno-0-249" name="__codelineno-0-249"></a><span class="sd">        &gt;&gt;&gt; is_copc("examples/data/sample.copc.laz")  # doctest: +SKIP</span>
-<a id="__codelineno-0-250" name="__codelineno-0-250"></a><span class="sd">        True</span>
-<a id="__codelineno-0-251" name="__codelineno-0-251"></a><span class="sd">        &gt;&gt;&gt; is_copc("examples/data/sample.laz")  # doctest: +SKIP</span>
-<a id="__codelineno-0-252" name="__codelineno-0-252"></a><span class="sd">        False</span>
+<span class="normal"><a href="#__codelineno-0-265">265</a></span>
+<span class="normal"><a href="#__codelineno-0-266">266</a></span>
+<span class="normal"><a href="#__codelineno-0-267">267</a></span>
+<span class="normal"><a href="#__codelineno-0-268">268</a></span>
+<span class="normal"><a href="#__codelineno-0-269">269</a></span>
+<span class="normal"><a href="#__codelineno-0-270">270</a></span>
+<span class="normal"><a href="#__codelineno-0-271">271</a></span>
+<span class="normal"><a href="#__codelineno-0-272">272</a></span>
+<span class="normal"><a href="#__codelineno-0-273">273</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-230" name="__codelineno-0-230"></a><span class="k">def</span><span class="w"> </span><span class="nf">is_copc</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<a id="__codelineno-0-231" name="__codelineno-0-231"></a><span class="w">    </span><span class="sd">"""Report whether ``source`` carries a COPC octree.</span>
+<a id="__codelineno-0-232" name="__codelineno-0-232"></a>
+<a id="__codelineno-0-233" name="__codelineno-0-233"></a><span class="sd">    This is the cheap question: it reads the header, the VLRs and the octree's root hierarchy page, never a</span>
+<a id="__codelineno-0-234" name="__codelineno-0-234"></a><span class="sd">    point record. On a remote source that is two range requests, not one - the root page sits past the point</span>
+<a id="__codelineno-0-235" name="__codelineno-0-235"></a><span class="sd">    data.</span>
+<a id="__codelineno-0-236" name="__codelineno-0-236"></a>
+<a id="__codelineno-0-237" name="__codelineno-0-237"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-238" name="__codelineno-0-238"></a><span class="sd">        source: the file to inspect, as a path or an open file object.</span>
+<a id="__codelineno-0-239" name="__codelineno-0-239"></a>
+<a id="__codelineno-0-240" name="__codelineno-0-240"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-241" name="__codelineno-0-241"></a><span class="sd">        ``True`` when the file is a valid COPC, ``False`` when it is a plain LAS/LAZ with no octree.</span>
+<a id="__codelineno-0-242" name="__codelineno-0-242"></a>
+<a id="__codelineno-0-243" name="__codelineno-0-243"></a><span class="sd">    Raises:</span>
+<a id="__codelineno-0-244" name="__codelineno-0-244"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
+<a id="__codelineno-0-245" name="__codelineno-0-245"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz`` - an uncompressed ``.las`` is never COPC.</span>
+<a id="__codelineno-0-246" name="__codelineno-0-246"></a><span class="sd">        laspy.errors.LazError: when the ``lazrs`` backend is missing. A predicate must not answer ``False`` to a</span>
+<a id="__codelineno-0-247" name="__codelineno-0-247"></a><span class="sd">            question it could not evaluate, so a backend failure surfaces rather than being swallowed.</span>
+<a id="__codelineno-0-248" name="__codelineno-0-248"></a><span class="sd">        laspy.errors.LaspyException: when the file is structurally broken (truncated or corrupt) - distinct from</span>
+<a id="__codelineno-0-249" name="__codelineno-0-249"></a><span class="sd">            "a valid file with no octree", which is the only case that returns ``False``.</span>
+<a id="__codelineno-0-250" name="__codelineno-0-250"></a>
+<a id="__codelineno-0-251" name="__codelineno-0-251"></a><span class="sd">    Examples:</span>
+<a id="__codelineno-0-252" name="__codelineno-0-252"></a><span class="sd">        An indexed cloud answers yes, and a plain LAZ answers no rather than raising - that is the question:</span>
 <a id="__codelineno-0-253" name="__codelineno-0-253"></a>
-<a id="__codelineno-0-254" name="__codelineno-0-254"></a><span class="sd">        Which makes it the way to choose a read path for a file of unknown provenance:</span>
-<a id="__codelineno-0-255" name="__codelineno-0-255"></a>
-<a id="__codelineno-0-256" name="__codelineno-0-256"></a><span class="sd">        &gt;&gt;&gt; path = "examples/data/sample.laz"  # doctest: +SKIP</span>
-<a id="__codelineno-0-257" name="__codelineno-0-257"></a><span class="sd">        &gt;&gt;&gt; read_window(path, bbox=(0, 0, 1, 1)) if is_copc(path) else "read it whole instead"  # doctest: +SKIP</span>
-<a id="__codelineno-0-258" name="__codelineno-0-258"></a><span class="sd">        'read it whole instead'</span>
-<a id="__codelineno-0-259" name="__codelineno-0-259"></a><span class="sd">    """</span>
-<a id="__codelineno-0-260" name="__codelineno-0-260"></a>    <span class="n">resolved</span> <span class="o">=</span> <span class="n">_resolve</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>  <span class="c1"># a bad suffix or a missing file is an error, not a "no" answer</span>
-<a id="__codelineno-0-261" name="__codelineno-0-261"></a>    <span class="k">try</span><span class="p">:</span>
-<a id="__codelineno-0-262" name="__codelineno-0-262"></a>        <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">resolved</span><span class="p">):</span>
-<a id="__codelineno-0-263" name="__codelineno-0-263"></a>            <span class="k">return</span> <span class="kc">True</span>
-<a id="__codelineno-0-264" name="__codelineno-0-264"></a>    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-<a id="__codelineno-0-265" name="__codelineno-0-265"></a>        <span class="k">return</span> <span class="kc">False</span>
+<a id="__codelineno-0-254" name="__codelineno-0-254"></a><span class="sd">        &gt;&gt;&gt; is_copc("examples/data/sample.copc.laz")  # doctest: +SKIP</span>
+<a id="__codelineno-0-255" name="__codelineno-0-255"></a><span class="sd">        True</span>
+<a id="__codelineno-0-256" name="__codelineno-0-256"></a><span class="sd">        &gt;&gt;&gt; is_copc("examples/data/sample.laz")  # doctest: +SKIP</span>
+<a id="__codelineno-0-257" name="__codelineno-0-257"></a><span class="sd">        False</span>
+<a id="__codelineno-0-258" name="__codelineno-0-258"></a>
+<a id="__codelineno-0-259" name="__codelineno-0-259"></a><span class="sd">        Which makes it the way to choose a read path for a file of unknown provenance:</span>
+<a id="__codelineno-0-260" name="__codelineno-0-260"></a>
+<a id="__codelineno-0-261" name="__codelineno-0-261"></a><span class="sd">        &gt;&gt;&gt; path = "examples/data/sample.laz"  # doctest: +SKIP</span>
+<a id="__codelineno-0-262" name="__codelineno-0-262"></a><span class="sd">        &gt;&gt;&gt; read_window(path, bbox=(0, 0, 1, 1)) if is_copc(path) else "read it whole instead"  # doctest: +SKIP</span>
+<a id="__codelineno-0-263" name="__codelineno-0-263"></a><span class="sd">        'read it whole instead'</span>
+<a id="__codelineno-0-264" name="__codelineno-0-264"></a><span class="sd">    """</span>
+<a id="__codelineno-0-265" name="__codelineno-0-265"></a>    <span class="c1"># Resolve FIRST, outside the try: a bad suffix or a missing file is an error, not a "no" answer, and both</span>
+<a id="__codelineno-0-266" name="__codelineno-0-266"></a>    <span class="c1"># raise ValueError - which the `except ValueError` below would otherwise swallow into a wrong False. This</span>
+<a id="__codelineno-0-267" name="__codelineno-0-267"></a>    <span class="c1"># call is load-bearing, not redundant with the one inside _reader; do not remove it.</span>
+<a id="__codelineno-0-268" name="__codelineno-0-268"></a>    <span class="n">resolved</span> <span class="o">=</span> <span class="n">_resolve</span><span class="p">(</span><span class="n">source</span><span class="p">)</span>
+<a id="__codelineno-0-269" name="__codelineno-0-269"></a>    <span class="k">try</span><span class="p">:</span>
+<a id="__codelineno-0-270" name="__codelineno-0-270"></a>        <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">resolved</span><span class="p">):</span>
+<a id="__codelineno-0-271" name="__codelineno-0-271"></a>            <span class="k">return</span> <span class="kc">True</span>
+<a id="__codelineno-0-272" name="__codelineno-0-272"></a>    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+<a id="__codelineno-0-273" name="__codelineno-0-273"></a>        <span class="k">return</span> <span class="kc">False</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8079,15 +8085,7 @@ question it could not evaluate, so a backend failure surfaces rather than being 
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/io/copc.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-268">268</a></span>
-<span class="normal"><a href="#__codelineno-0-269">269</a></span>
-<span class="normal"><a href="#__codelineno-0-270">270</a></span>
-<span class="normal"><a href="#__codelineno-0-271">271</a></span>
-<span class="normal"><a href="#__codelineno-0-272">272</a></span>
-<span class="normal"><a href="#__codelineno-0-273">273</a></span>
-<span class="normal"><a href="#__codelineno-0-274">274</a></span>
-<span class="normal"><a href="#__codelineno-0-275">275</a></span>
-<span class="normal"><a href="#__codelineno-0-276">276</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-276">276</a></span>
 <span class="normal"><a href="#__codelineno-0-277">277</a></span>
 <span class="normal"><a href="#__codelineno-0-278">278</a></span>
 <span class="normal"><a href="#__codelineno-0-279">279</a></span>
@@ -8115,43 +8113,51 @@ question it could not evaluate, so a backend failure surfaces rather than being 
 <span class="normal"><a href="#__codelineno-0-301">301</a></span>
 <span class="normal"><a href="#__codelineno-0-302">302</a></span>
 <span class="normal"><a href="#__codelineno-0-303">303</a></span>
-<span class="normal"><a href="#__codelineno-0-304">304</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-268" name="__codelineno-0-268"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_header</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CopcHeaderInfo</span><span class="p">:</span>
-<a id="__codelineno-0-269" name="__codelineno-0-269"></a><span class="w">    </span><span class="sd">"""Read a COPC file's header and octree root properties, touching no point records.</span>
-<a id="__codelineno-0-270" name="__codelineno-0-270"></a>
-<a id="__codelineno-0-271" name="__codelineno-0-271"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-272" name="__codelineno-0-272"></a><span class="sd">        source: the COPC file to open, as a path or an open file object.</span>
-<a id="__codelineno-0-273" name="__codelineno-0-273"></a>
-<a id="__codelineno-0-274" name="__codelineno-0-274"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-275" name="__codelineno-0-275"></a><span class="sd">        A :class:`CopcHeaderInfo` with count, bounds, CRS, dimensions, format metadata and the root ``spacing``.</span>
-<a id="__codelineno-0-276" name="__codelineno-0-276"></a>
-<a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-278" name="__codelineno-0-278"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
-<a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz``, or the file carries no COPC octree.</span>
-<a id="__codelineno-0-280" name="__codelineno-0-280"></a>
-<a id="__codelineno-0-281" name="__codelineno-0-281"></a><span class="sd">    Examples:</span>
-<a id="__codelineno-0-282" name="__codelineno-0-282"></a><span class="sd">        The size and extent of a cloud are answerable before deciding whether to read any of it:</span>
-<a id="__codelineno-0-283" name="__codelineno-0-283"></a>
-<a id="__codelineno-0-284" name="__codelineno-0-284"></a><span class="sd">        &gt;&gt;&gt; info = read_header("examples/data/sample.copc.laz")  # doctest: +SKIP</span>
-<a id="__codelineno-0-285" name="__codelineno-0-285"></a><span class="sd">        &gt;&gt;&gt; info.count, info.spacing  # header only - no records touched  # doctest: +SKIP</span>
-<a id="__codelineno-0-286" name="__codelineno-0-286"></a><span class="sd">        (1600, 7.8)</span>
-<a id="__codelineno-0-287" name="__codelineno-0-287"></a>
-<a id="__codelineno-0-288" name="__codelineno-0-288"></a><span class="sd">        ``spacing`` says what a coarse read will cost: asking for it reads the root node alone:</span>
-<a id="__codelineno-0-289" name="__codelineno-0-289"></a>
-<a id="__codelineno-0-290" name="__codelineno-0-290"></a><span class="sd">        &gt;&gt;&gt; info = read_header("examples/data/sample.copc.laz")  # doctest: +SKIP</span>
-<a id="__codelineno-0-291" name="__codelineno-0-291"></a><span class="sd">        &gt;&gt;&gt; read_window("examples/data/sample.copc.laz", resolution=info.spacing)["x"].size  # doctest: +SKIP</span>
-<a id="__codelineno-0-292" name="__codelineno-0-292"></a><span class="sd">        100</span>
-<a id="__codelineno-0-293" name="__codelineno-0-293"></a><span class="sd">    """</span>
-<a id="__codelineno-0-294" name="__codelineno-0-294"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
-<a id="__codelineno-0-295" name="__codelineno-0-295"></a>        <span class="n">header</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">header</span>
-<a id="__codelineno-0-296" name="__codelineno-0-296"></a>        <span class="k">return</span> <span class="n">CopcHeaderInfo</span><span class="p">(</span>
-<a id="__codelineno-0-297" name="__codelineno-0-297"></a>            <span class="n">count</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">point_count</span><span class="p">),</span>
-<a id="__codelineno-0-298" name="__codelineno-0-298"></a>            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">x_min</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">y_min</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">x_max</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">y_max</span><span class="p">)),</span>
-<a id="__codelineno-0-299" name="__codelineno-0-299"></a>            <span class="n">crs</span><span class="o">=</span><span class="n">header</span><span class="o">.</span><span class="n">parse_crs</span><span class="p">(),</span>
-<a id="__codelineno-0-300" name="__codelineno-0-300"></a>            <span class="n">dimensions</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">point_format</span><span class="o">.</span><span class="n">dimension_names</span><span class="p">),</span>
-<a id="__codelineno-0-301" name="__codelineno-0-301"></a>            <span class="n">version</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">version</span><span class="p">),</span>
-<a id="__codelineno-0-302" name="__codelineno-0-302"></a>            <span class="n">point_format</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">point_format</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
-<a id="__codelineno-0-303" name="__codelineno-0-303"></a>            <span class="n">spacing</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">copc_info</span><span class="o">.</span><span class="n">spacing</span><span class="p">),</span>
-<a id="__codelineno-0-304" name="__codelineno-0-304"></a>        <span class="p">)</span>
+<span class="normal"><a href="#__codelineno-0-304">304</a></span>
+<span class="normal"><a href="#__codelineno-0-305">305</a></span>
+<span class="normal"><a href="#__codelineno-0-306">306</a></span>
+<span class="normal"><a href="#__codelineno-0-307">307</a></span>
+<span class="normal"><a href="#__codelineno-0-308">308</a></span>
+<span class="normal"><a href="#__codelineno-0-309">309</a></span>
+<span class="normal"><a href="#__codelineno-0-310">310</a></span>
+<span class="normal"><a href="#__codelineno-0-311">311</a></span>
+<span class="normal"><a href="#__codelineno-0-312">312</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-276" name="__codelineno-0-276"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_header</span><span class="p">(</span><span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CopcHeaderInfo</span><span class="p">:</span>
+<a id="__codelineno-0-277" name="__codelineno-0-277"></a><span class="w">    </span><span class="sd">"""Read a COPC file's header and octree root properties, touching no point records.</span>
+<a id="__codelineno-0-278" name="__codelineno-0-278"></a>
+<a id="__codelineno-0-279" name="__codelineno-0-279"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-280" name="__codelineno-0-280"></a><span class="sd">        source: the COPC file to open, as a path or an open file object.</span>
+<a id="__codelineno-0-281" name="__codelineno-0-281"></a>
+<a id="__codelineno-0-282" name="__codelineno-0-282"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-283" name="__codelineno-0-283"></a><span class="sd">        A :class:`CopcHeaderInfo` with count, bounds, CRS, dimensions, format metadata and the root ``spacing``.</span>
+<a id="__codelineno-0-284" name="__codelineno-0-284"></a>
+<a id="__codelineno-0-285" name="__codelineno-0-285"></a><span class="sd">    Raises:</span>
+<a id="__codelineno-0-286" name="__codelineno-0-286"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
+<a id="__codelineno-0-287" name="__codelineno-0-287"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz``, or the file carries no COPC octree.</span>
+<a id="__codelineno-0-288" name="__codelineno-0-288"></a>
+<a id="__codelineno-0-289" name="__codelineno-0-289"></a><span class="sd">    Examples:</span>
+<a id="__codelineno-0-290" name="__codelineno-0-290"></a><span class="sd">        The size and extent of a cloud are answerable before deciding whether to read any of it:</span>
+<a id="__codelineno-0-291" name="__codelineno-0-291"></a>
+<a id="__codelineno-0-292" name="__codelineno-0-292"></a><span class="sd">        &gt;&gt;&gt; info = read_header("examples/data/sample.copc.laz")  # doctest: +SKIP</span>
+<a id="__codelineno-0-293" name="__codelineno-0-293"></a><span class="sd">        &gt;&gt;&gt; info.count, info.spacing  # header only - no records touched  # doctest: +SKIP</span>
+<a id="__codelineno-0-294" name="__codelineno-0-294"></a><span class="sd">        (1600, 7.8)</span>
+<a id="__codelineno-0-295" name="__codelineno-0-295"></a>
+<a id="__codelineno-0-296" name="__codelineno-0-296"></a><span class="sd">        ``spacing`` says what a coarse read will cost: asking for it reads the root node alone:</span>
+<a id="__codelineno-0-297" name="__codelineno-0-297"></a>
+<a id="__codelineno-0-298" name="__codelineno-0-298"></a><span class="sd">        &gt;&gt;&gt; info = read_header("examples/data/sample.copc.laz")  # doctest: +SKIP</span>
+<a id="__codelineno-0-299" name="__codelineno-0-299"></a><span class="sd">        &gt;&gt;&gt; read_window("examples/data/sample.copc.laz", resolution=info.spacing)["x"].size  # doctest: +SKIP</span>
+<a id="__codelineno-0-300" name="__codelineno-0-300"></a><span class="sd">        100</span>
+<a id="__codelineno-0-301" name="__codelineno-0-301"></a><span class="sd">    """</span>
+<a id="__codelineno-0-302" name="__codelineno-0-302"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
+<a id="__codelineno-0-303" name="__codelineno-0-303"></a>        <span class="n">header</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">header</span>
+<a id="__codelineno-0-304" name="__codelineno-0-304"></a>        <span class="k">return</span> <span class="n">CopcHeaderInfo</span><span class="p">(</span>
+<a id="__codelineno-0-305" name="__codelineno-0-305"></a>            <span class="n">count</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">point_count</span><span class="p">),</span>
+<a id="__codelineno-0-306" name="__codelineno-0-306"></a>            <span class="n">bounds</span><span class="o">=</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">x_min</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">y_min</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">x_max</span><span class="p">),</span> <span class="nb">float</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">y_max</span><span class="p">)),</span>
+<a id="__codelineno-0-307" name="__codelineno-0-307"></a>            <span class="n">crs</span><span class="o">=</span><span class="n">header</span><span class="o">.</span><span class="n">parse_crs</span><span class="p">(),</span>
+<a id="__codelineno-0-308" name="__codelineno-0-308"></a>            <span class="n">dimensions</span><span class="o">=</span><span class="nb">tuple</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">header</span><span class="o">.</span><span class="n">point_format</span><span class="o">.</span><span class="n">dimension_names</span><span class="p">),</span>
+<a id="__codelineno-0-309" name="__codelineno-0-309"></a>            <span class="n">version</span><span class="o">=</span><span class="nb">str</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">version</span><span class="p">),</span>
+<a id="__codelineno-0-310" name="__codelineno-0-310"></a>            <span class="n">point_format</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="n">header</span><span class="o">.</span><span class="n">point_format</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+<a id="__codelineno-0-311" name="__codelineno-0-311"></a>            <span class="n">spacing</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">reader</span><span class="o">.</span><span class="n">copc_info</span><span class="o">.</span><span class="n">spacing</span><span class="p">),</span>
+<a id="__codelineno-0-312" name="__codelineno-0-312"></a>        <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8405,32 +8411,7 @@ given.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/io/copc.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-365">365</a></span>
-<span class="normal"><a href="#__codelineno-0-366">366</a></span>
-<span class="normal"><a href="#__codelineno-0-367">367</a></span>
-<span class="normal"><a href="#__codelineno-0-368">368</a></span>
-<span class="normal"><a href="#__codelineno-0-369">369</a></span>
-<span class="normal"><a href="#__codelineno-0-370">370</a></span>
-<span class="normal"><a href="#__codelineno-0-371">371</a></span>
-<span class="normal"><a href="#__codelineno-0-372">372</a></span>
-<span class="normal"><a href="#__codelineno-0-373">373</a></span>
-<span class="normal"><a href="#__codelineno-0-374">374</a></span>
-<span class="normal"><a href="#__codelineno-0-375">375</a></span>
-<span class="normal"><a href="#__codelineno-0-376">376</a></span>
-<span class="normal"><a href="#__codelineno-0-377">377</a></span>
-<span class="normal"><a href="#__codelineno-0-378">378</a></span>
-<span class="normal"><a href="#__codelineno-0-379">379</a></span>
-<span class="normal"><a href="#__codelineno-0-380">380</a></span>
-<span class="normal"><a href="#__codelineno-0-381">381</a></span>
-<span class="normal"><a href="#__codelineno-0-382">382</a></span>
-<span class="normal"><a href="#__codelineno-0-383">383</a></span>
-<span class="normal"><a href="#__codelineno-0-384">384</a></span>
-<span class="normal"><a href="#__codelineno-0-385">385</a></span>
-<span class="normal"><a href="#__codelineno-0-386">386</a></span>
-<span class="normal"><a href="#__codelineno-0-387">387</a></span>
-<span class="normal"><a href="#__codelineno-0-388">388</a></span>
-<span class="normal"><a href="#__codelineno-0-389">389</a></span>
-<span class="normal"><a href="#__codelineno-0-390">390</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-390">390</a></span>
 <span class="normal"><a href="#__codelineno-0-391">391</a></span>
 <span class="normal"><a href="#__codelineno-0-392">392</a></span>
 <span class="normal"><a href="#__codelineno-0-393">393</a></span>
@@ -8476,78 +8457,105 @@ given.</p>
 <span class="normal"><a href="#__codelineno-0-433">433</a></span>
 <span class="normal"><a href="#__codelineno-0-434">434</a></span>
 <span class="normal"><a href="#__codelineno-0-435">435</a></span>
-<span class="normal"><a href="#__codelineno-0-436">436</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-365" name="__codelineno-0-365"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_window</span><span class="p">(</span>
-<a id="__codelineno-0-366" name="__codelineno-0-366"></a>    <span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">,</span>
-<a id="__codelineno-0-367" name="__codelineno-0-367"></a>    <span class="o">*</span><span class="p">,</span>
-<a id="__codelineno-0-368" name="__codelineno-0-368"></a>    <span class="n">bbox</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-369" name="__codelineno-0-369"></a>    <span class="n">resolution</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-370" name="__codelineno-0-370"></a>    <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">range</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-371" name="__codelineno-0-371"></a>    <span class="n">dimensions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
-<a id="__codelineno-0-372" name="__codelineno-0-372"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
-<a id="__codelineno-0-373" name="__codelineno-0-373"></a><span class="w">    </span><span class="sd">"""Read only the points a window selects, using the file's octree rather than scanning every record.</span>
-<a id="__codelineno-0-374" name="__codelineno-0-374"></a>
-<a id="__codelineno-0-375" name="__codelineno-0-375"></a><span class="sd">    With no argument at all this reads the whole cloud, which is the honest default but also the expensive one -</span>
-<a id="__codelineno-0-376" name="__codelineno-0-376"></a><span class="sd">    the point of the function is to pass a window.</span>
-<a id="__codelineno-0-377" name="__codelineno-0-377"></a>
-<a id="__codelineno-0-378" name="__codelineno-0-378"></a><span class="sd">    Args:</span>
-<a id="__codelineno-0-379" name="__codelineno-0-379"></a><span class="sd">        source: the COPC file to open, as a path or an open file object.</span>
-<a id="__codelineno-0-380" name="__codelineno-0-380"></a><span class="sd">        bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS. Only chunks whose octree voxel overlaps the box are</span>
-<a id="__codelineno-0-381" name="__codelineno-0-381"></a><span class="sd">            fetched, and the points are then clipped exactly to the box, to the float edge. 2-D: the full z</span>
-<a id="__codelineno-0-382" name="__codelineno-0-382"></a><span class="sd">            range is always kept. A box larger than the file is clamped to the file's extent; a non-finite</span>
-<a id="__codelineno-0-383" name="__codelineno-0-383"></a><span class="sd">            corner is rejected.</span>
-<a id="__codelineno-0-384" name="__codelineno-0-384"></a><span class="sd">        resolution: target point spacing in the data's units. The octree is visited only down to the level that</span>
-<a id="__codelineno-0-385" name="__codelineno-0-385"></a><span class="sd">            satisfies it, measured against :attr:`CopcHeaderInfo.spacing`, so a wide view stays cheap. Mutually</span>
-<a id="__codelineno-0-386" name="__codelineno-0-386"></a><span class="sd">            exclusive with ``level``.</span>
-<a id="__codelineno-0-387" name="__codelineno-0-387"></a><span class="sd">        level: an exact octree level, or a ``range`` of them, when a caller would rather name levels than a</span>
-<a id="__codelineno-0-388" name="__codelineno-0-388"></a><span class="sd">            spacing. Mutually exclusive with ``resolution``.</span>
-<a id="__codelineno-0-389" name="__codelineno-0-389"></a><span class="sd">        dimensions: dimension names to return, case-insensitive. ``None`` returns every dimension the package</span>
-<a id="__codelineno-0-390" name="__codelineno-0-390"></a><span class="sd">            maps onto a :class:`~pointclouds.points.PointCloud` field. This selects what comes back, not what is</span>
-<a id="__codelineno-0-391" name="__codelineno-0-391"></a><span class="sd">            decompressed: laspy decompresses every selected point in full, and the dimensions not asked for are</span>
-<a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="sd">            dropped afterwards. It trims the result, not the read.</span>
-<a id="__codelineno-0-393" name="__codelineno-0-393"></a>
-<a id="__codelineno-0-394" name="__codelineno-0-394"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-395" name="__codelineno-0-395"></a><span class="sd">        A mapping of lower-case dimension name to array, under the same contract as</span>
-<a id="__codelineno-0-396" name="__codelineno-0-396"></a><span class="sd">        :func:`pointclouds.io.las.read_points`: a dimension the point format does not declare comes back as a</span>
-<a id="__codelineno-0-397" name="__codelineno-0-397"></a><span class="sd">        zero-length array, never as a missing key. A window that selects nothing gives zero-length arrays</span>
-<a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="sd">        throughout.</span>
+<span class="normal"><a href="#__codelineno-0-436">436</a></span>
+<span class="normal"><a href="#__codelineno-0-437">437</a></span>
+<span class="normal"><a href="#__codelineno-0-438">438</a></span>
+<span class="normal"><a href="#__codelineno-0-439">439</a></span>
+<span class="normal"><a href="#__codelineno-0-440">440</a></span>
+<span class="normal"><a href="#__codelineno-0-441">441</a></span>
+<span class="normal"><a href="#__codelineno-0-442">442</a></span>
+<span class="normal"><a href="#__codelineno-0-443">443</a></span>
+<span class="normal"><a href="#__codelineno-0-444">444</a></span>
+<span class="normal"><a href="#__codelineno-0-445">445</a></span>
+<span class="normal"><a href="#__codelineno-0-446">446</a></span>
+<span class="normal"><a href="#__codelineno-0-447">447</a></span>
+<span class="normal"><a href="#__codelineno-0-448">448</a></span>
+<span class="normal"><a href="#__codelineno-0-449">449</a></span>
+<span class="normal"><a href="#__codelineno-0-450">450</a></span>
+<span class="normal"><a href="#__codelineno-0-451">451</a></span>
+<span class="normal"><a href="#__codelineno-0-452">452</a></span>
+<span class="normal"><a href="#__codelineno-0-453">453</a></span>
+<span class="normal"><a href="#__codelineno-0-454">454</a></span>
+<span class="normal"><a href="#__codelineno-0-455">455</a></span>
+<span class="normal"><a href="#__codelineno-0-456">456</a></span>
+<span class="normal"><a href="#__codelineno-0-457">457</a></span>
+<span class="normal"><a href="#__codelineno-0-458">458</a></span>
+<span class="normal"><a href="#__codelineno-0-459">459</a></span>
+<span class="normal"><a href="#__codelineno-0-460">460</a></span>
+<span class="normal"><a href="#__codelineno-0-461">461</a></span>
+<span class="normal"><a href="#__codelineno-0-462">462</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-390" name="__codelineno-0-390"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_window</span><span class="p">(</span>
+<a id="__codelineno-0-391" name="__codelineno-0-391"></a>    <span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">,</span>
+<a id="__codelineno-0-392" name="__codelineno-0-392"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-0-393" name="__codelineno-0-393"></a>    <span class="n">bbox</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-394" name="__codelineno-0-394"></a>    <span class="n">resolution</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-395" name="__codelineno-0-395"></a>    <span class="n">level</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="nb">range</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-396" name="__codelineno-0-396"></a>    <span class="n">dimensions</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-0-397" name="__codelineno-0-397"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">]:</span>
+<a id="__codelineno-0-398" name="__codelineno-0-398"></a><span class="w">    </span><span class="sd">"""Read only the points a window selects, using the file's octree rather than scanning every record.</span>
 <a id="__codelineno-0-399" name="__codelineno-0-399"></a>
-<a id="__codelineno-0-400" name="__codelineno-0-400"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-401" name="__codelineno-0-401"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
-<a id="__codelineno-0-402" name="__codelineno-0-402"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is</span>
-<a id="__codelineno-0-403" name="__codelineno-0-403"></a><span class="sd">            malformed, non-finite or inverted; when ``resolution`` is not a positive finite number; when</span>
-<a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="sd">            ``level`` is not a non-negative ``int`` or ``range`` of octree levels (a ``bool``, a float, a</span>
-<a id="__codelineno-0-405" name="__codelineno-0-405"></a><span class="sd">            negative level, or an empty range are all rejected); or when ``resolution`` and ``level`` are both</span>
-<a id="__codelineno-0-406" name="__codelineno-0-406"></a><span class="sd">            given.</span>
-<a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">        KeyError: when a requested dimension is not one this package reads.</span>
-<a id="__codelineno-0-408" name="__codelineno-0-408"></a>
-<a id="__codelineno-0-409" name="__codelineno-0-409"></a><span class="sd">    Examples:</span>
-<a id="__codelineno-0-410" name="__codelineno-0-410"></a><span class="sd">        A bounding box reads a corner of the cloud, fetching only the chunks that reach into it:</span>
-<a id="__codelineno-0-411" name="__codelineno-0-411"></a>
-<a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">        &gt;&gt;&gt; arrays = read_window(  # doctest: +SKIP</span>
-<a id="__codelineno-0-413" name="__codelineno-0-413"></a><span class="sd">        ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)</span>
-<a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        ... )</span>
-<a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">        &gt;&gt;&gt; arrays["x"].size  # 121 of the file's 1600 points  # doctest: +SKIP</span>
-<a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">        121</span>
-<a id="__codelineno-0-417" name="__codelineno-0-417"></a>
-<a id="__codelineno-0-418" name="__codelineno-0-418"></a><span class="sd">        A resolution reads the whole extent sparsely instead, which is what a zoomed-out view wants:</span>
-<a id="__codelineno-0-419" name="__codelineno-0-419"></a>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        &gt;&gt;&gt; coarse = read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">        &gt;&gt;&gt; coarse["x"].size, coarse["classification"].size  # doctest: +SKIP</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">        (100, 100)</span>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        The two compose, and a dimension list selects which arrays come back:</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        &gt;&gt;&gt; corner = read_window(  # doctest: +SKIP</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        ...     "examples/data/sample.copc.laz",</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">        ...     bbox=(155000, 463000, 155020, 463020),</span>
-<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        ...     resolution=7.8,</span>
-<a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">        ...     dimensions=("X", "Y"),</span>
-<a id="__codelineno-0-431" name="__codelineno-0-431"></a><span class="sd">        ... )</span>
-<a id="__codelineno-0-432" name="__codelineno-0-432"></a><span class="sd">        &gt;&gt;&gt; sorted(corner)  # doctest: +SKIP</span>
-<a id="__codelineno-0-433" name="__codelineno-0-433"></a><span class="sd">        ['x', 'y']</span>
-<a id="__codelineno-0-434" name="__codelineno-0-434"></a><span class="sd">    """</span>
-<a id="__codelineno-0-435" name="__codelineno-0-435"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
-<a id="__codelineno-0-436" name="__codelineno-0-436"></a>        <span class="k">return</span> <span class="n">_query_window</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">dimensions</span><span class="o">=</span><span class="n">dimensions</span><span class="p">)</span>
+<a id="__codelineno-0-400" name="__codelineno-0-400"></a><span class="sd">    With no argument at all this reads the whole cloud, which is the honest default but also the expensive one -</span>
+<a id="__codelineno-0-401" name="__codelineno-0-401"></a><span class="sd">    the point of the function is to pass a window.</span>
+<a id="__codelineno-0-402" name="__codelineno-0-402"></a>
+<a id="__codelineno-0-403" name="__codelineno-0-403"></a><span class="sd">    Args:</span>
+<a id="__codelineno-0-404" name="__codelineno-0-404"></a><span class="sd">        source: the COPC file to open, as a path or an open file object.</span>
+<a id="__codelineno-0-405" name="__codelineno-0-405"></a><span class="sd">        bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS. Only chunks whose octree voxel overlaps the box are</span>
+<a id="__codelineno-0-406" name="__codelineno-0-406"></a><span class="sd">            fetched, and the points are then clipped exactly to the box, to the float edge. 2-D: the full z</span>
+<a id="__codelineno-0-407" name="__codelineno-0-407"></a><span class="sd">            range is always kept. A box larger than the file is clamped to the file's extent; a non-finite</span>
+<a id="__codelineno-0-408" name="__codelineno-0-408"></a><span class="sd">            corner is rejected.</span>
+<a id="__codelineno-0-409" name="__codelineno-0-409"></a><span class="sd">        resolution: target point spacing in the data's units. The octree is visited only down to the level that</span>
+<a id="__codelineno-0-410" name="__codelineno-0-410"></a><span class="sd">            satisfies it, measured against :attr:`CopcHeaderInfo.spacing`, so a wide view stays cheap. Mutually</span>
+<a id="__codelineno-0-411" name="__codelineno-0-411"></a><span class="sd">            exclusive with ``level``.</span>
+<a id="__codelineno-0-412" name="__codelineno-0-412"></a><span class="sd">        level: an exact octree level, or a ``range`` of them, when a caller would rather name levels than a</span>
+<a id="__codelineno-0-413" name="__codelineno-0-413"></a><span class="sd">            spacing. Mutually exclusive with ``resolution``.</span>
+<a id="__codelineno-0-414" name="__codelineno-0-414"></a><span class="sd">        dimensions: dimension names to return, case-insensitive. ``None`` returns every dimension the package</span>
+<a id="__codelineno-0-415" name="__codelineno-0-415"></a><span class="sd">            maps onto a :class:`~pointclouds.points.PointCloud` field. This selects what comes back, not what is</span>
+<a id="__codelineno-0-416" name="__codelineno-0-416"></a><span class="sd">            decompressed: laspy decompresses every selected point in full, and the dimensions not asked for are</span>
+<a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">            dropped afterwards. It trims the result, not the read.</span>
+<a id="__codelineno-0-418" name="__codelineno-0-418"></a>
+<a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        A mapping of lower-case dimension name to array, under the same contract as</span>
+<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">        :func:`pointclouds.io.las.read_points`: a dimension the point format does not declare comes back as a</span>
+<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">        zero-length array, never as a missing key. A window that selects nothing gives zero-length arrays</span>
+<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">        throughout.</span>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">    Raises:</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">            malformed, non-finite or inverted; when ``resolution`` is not a positive finite number; when</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">            ``level`` is not a non-negative ``int`` or ``range`` of octree levels (a ``bool``, a float, a</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">            negative level, or an empty range are all rejected); or when ``resolution`` and ``level`` are both</span>
+<a id="__codelineno-0-431" name="__codelineno-0-431"></a><span class="sd">            given.</span>
+<a id="__codelineno-0-432" name="__codelineno-0-432"></a><span class="sd">        KeyError: when a requested dimension is not one this package reads.</span>
+<a id="__codelineno-0-433" name="__codelineno-0-433"></a>
+<a id="__codelineno-0-434" name="__codelineno-0-434"></a><span class="sd">    Examples:</span>
+<a id="__codelineno-0-435" name="__codelineno-0-435"></a><span class="sd">        A bounding box reads a corner of the cloud, fetching only the chunks that reach into it:</span>
+<a id="__codelineno-0-436" name="__codelineno-0-436"></a>
+<a id="__codelineno-0-437" name="__codelineno-0-437"></a><span class="sd">        &gt;&gt;&gt; arrays = read_window(  # doctest: +SKIP</span>
+<a id="__codelineno-0-438" name="__codelineno-0-438"></a><span class="sd">        ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)</span>
+<a id="__codelineno-0-439" name="__codelineno-0-439"></a><span class="sd">        ... )</span>
+<a id="__codelineno-0-440" name="__codelineno-0-440"></a><span class="sd">        &gt;&gt;&gt; arrays["x"].size  # 121 of the file's 1600 points  # doctest: +SKIP</span>
+<a id="__codelineno-0-441" name="__codelineno-0-441"></a><span class="sd">        121</span>
+<a id="__codelineno-0-442" name="__codelineno-0-442"></a>
+<a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">        A resolution reads the whole extent sparsely instead, which is what a zoomed-out view wants:</span>
+<a id="__codelineno-0-444" name="__codelineno-0-444"></a>
+<a id="__codelineno-0-445" name="__codelineno-0-445"></a><span class="sd">        &gt;&gt;&gt; coarse = read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP</span>
+<a id="__codelineno-0-446" name="__codelineno-0-446"></a><span class="sd">        &gt;&gt;&gt; coarse["x"].size, coarse["classification"].size  # doctest: +SKIP</span>
+<a id="__codelineno-0-447" name="__codelineno-0-447"></a><span class="sd">        (100, 100)</span>
+<a id="__codelineno-0-448" name="__codelineno-0-448"></a>
+<a id="__codelineno-0-449" name="__codelineno-0-449"></a><span class="sd">        The two compose, and a dimension list selects which arrays come back:</span>
+<a id="__codelineno-0-450" name="__codelineno-0-450"></a>
+<a id="__codelineno-0-451" name="__codelineno-0-451"></a><span class="sd">        &gt;&gt;&gt; corner = read_window(  # doctest: +SKIP</span>
+<a id="__codelineno-0-452" name="__codelineno-0-452"></a><span class="sd">        ...     "examples/data/sample.copc.laz",</span>
+<a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="sd">        ...     bbox=(155000, 463000, 155020, 463020),</span>
+<a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="sd">        ...     resolution=7.8,</span>
+<a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="sd">        ...     dimensions=("X", "Y"),</span>
+<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">        ... )</span>
+<a id="__codelineno-0-457" name="__codelineno-0-457"></a><span class="sd">        &gt;&gt;&gt; sorted(corner)  # doctest: +SKIP</span>
+<a id="__codelineno-0-458" name="__codelineno-0-458"></a><span class="sd">        ['x', 'y']</span>
+<a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="sd">    """</span>
+<a id="__codelineno-0-460" name="__codelineno-0-460"></a>    <span class="n">requested</span> <span class="o">=</span> <span class="n">_validate_window</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">resolution</span><span class="p">,</span> <span class="n">level</span><span class="p">,</span> <span class="n">dimensions</span><span class="p">)</span>  <span class="c1"># before the open: no I/O on bad input</span>
+<a id="__codelineno-0-461" name="__codelineno-0-461"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
+<a id="__codelineno-0-462" name="__codelineno-0-462"></a>        <span class="k">return</span> <span class="n">_query_window</span><span class="p">(</span><span class="n">reader</span><span class="p">,</span> <span class="n">bbox</span><span class="o">=</span><span class="n">bbox</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">,</span> <span class="n">requested</span><span class="o">=</span><span class="n">requested</span><span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
