@@ -593,3 +593,44 @@ class TestSourceHandling:
 
         with pytest.raises(ValueError, match="seekable"):
             copc.read_window(stream, bbox=CORNER_BBOX)
+
+
+class _CountingBytesIO(io.BytesIO):
+    """A BytesIO that tallies read/seek calls, to assert a path opens the file only once."""
+
+    def __init__(self, data: bytes) -> None:
+        super().__init__(data)
+        self.reads = 0
+        self.seeks = 0
+
+    def read(self, size: int = -1) -> bytes:
+        self.reads += 1
+        return super().read(size)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        self.seeks += 1
+        return super().seek(offset, whence)
+
+
+class TestSingleOpen:
+    """`PointCloud.read_window` must not re-open the source just to fetch the CRS (M4)."""
+
+    def test_the_container_does_not_double_the_io(self, sample_copc):
+        """Reading a window plus its CRS costs one open, not two.
+
+        The engine-level `copc.read_window` is the single-open baseline; the container-level
+        `PointCloud.read_window`, which also needs the CRS, must not re-parse the header and re-fetch the
+        hierarchy a second time.
+        """
+        from pointclouds import PointCloud
+
+        engine_io = _CountingBytesIO(sample_copc.read_bytes())
+        copc.read_window(engine_io, bbox=CORNER_BBOX)
+
+        container_io = _CountingBytesIO(sample_copc.read_bytes())
+        cloud = PointCloud.read_window(container_io, bbox=CORNER_BBOX)
+
+        assert cloud.crs.to_epsg() == 28992
+        assert container_io.reads <= engine_io.reads, (
+            f"container did {container_io.reads} reads vs the engine's {engine_io.reads} - it re-opened the file"
+        )

@@ -230,8 +230,7 @@ class PointCloud:
             >>> nothing.count  # doctest: +SKIP
             0
         """
-        crs = _copc.read_header(source).crs
-        arrays = _copc.read_window(source, bbox=bbox, resolution=resolution, level=level)
+        crs, arrays = _copc._read_window_with_crs(source, bbox=bbox, resolution=resolution, level=level)
         return cls(crs=crs, **arrays)
 
     def load(self) -> PointCloud:

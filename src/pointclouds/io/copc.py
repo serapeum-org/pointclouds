@@ -43,6 +43,7 @@ import laspy
 import numpy as np
 from laspy.copc import Bounds
 from laspy.errors import LaspyException, LazError
+from pyproj import CRS
 
 from pointclouds.io import _records
 from pointclouds.io.las import LasHeaderInfo
@@ -423,6 +424,33 @@ def read_window(
         >>> sorted(corner)  # doctest: +SKIP
         ['x', 'y']
     """
+    with _reader(source) as reader:
+        return _query_window(reader, bbox=bbox, resolution=resolution, level=level, dimensions=dimensions)
+
+
+def _query_window(
+    reader: laspy.CopcReader,
+    *,
+    bbox: tuple[float, float, float, float] | None,
+    resolution: float | None,
+    level: int | range | None,
+    dimensions: tuple[str, ...] | None,
+) -> dict[str, np.ndarray]:
+    """Run one octree query on an already-open reader and return the record arrays.
+
+    Split out of :func:`read_window` so the one open can be shared: :func:`_read_window_with_crs` reads the CRS
+    and the window from the same reader rather than opening the source twice.
+
+    Args:
+        reader: an open :class:`laspy.CopcReader`.
+        bbox: see :func:`read_window`.
+        resolution: see :func:`read_window`.
+        level: see :func:`read_window`.
+        dimensions: see :func:`read_window`.
+
+    Returns:
+        The record-array mapping, as :func:`read_window` documents.
+    """
     if resolution is not None and level is not None:
         raise ValueError("pass either resolution= or level=, not both; they are two ways to say the same thing")
     if resolution is not None and resolution <= 0:
@@ -434,11 +462,40 @@ def read_window(
     # An exact bbox clip needs x and y even when the caller did not ask for them; read them, then drop them
     # again if they were not requested.
     needed = requested if bbox is None else tuple(dict.fromkeys(("x", "y", *requested)))
+    bounds = None if bbox is None else _as_bounds(bbox, reader.header)
+    points = reader.query(bounds=bounds, resolution=resolution, level=level)
+    arrays = _records.extract(points, needed)
+    if bbox is not None:
+        arrays = _clip_to_box(arrays, bbox)
+        arrays = {name: arrays[name] for name in requested}
+    return arrays
+
+
+def _read_window_with_crs(
+    source: Source,
+    *,
+    bbox: tuple[float, float, float, float] | None = None,
+    resolution: float | None = None,
+    level: int | range | None = None,
+    dimensions: tuple[str, ...] | None = None,
+) -> tuple[CRS | None, dict[str, np.ndarray]]:
+    """Read a window and the file's CRS from a single open of ``source``.
+
+    :class:`~pointclouds.points.PointCloud` needs both to build a windowed cloud. Doing it in one open avoids a
+    second header parse and hierarchy fetch - a doubled round-trip on the remote source this feature targets,
+    and a TOCTOU window on a path that is rewritten between the two reads.
+
+    Args:
+        source: the COPC file, as a path or an open file object.
+        bbox: see :func:`read_window`.
+        resolution: see :func:`read_window`.
+        level: see :func:`read_window`.
+        dimensions: see :func:`read_window`.
+
+    Returns:
+        ``(crs, arrays)`` - the file's CRS (or ``None``) and the record-array mapping.
+    """
     with _reader(source) as reader:
-        bounds = None if bbox is None else _as_bounds(bbox, reader.header)
-        points = reader.query(bounds=bounds, resolution=resolution, level=level)
-        arrays = _records.extract(points, needed)
-        if bbox is not None:
-            arrays = _clip_to_box(arrays, bbox)
-            arrays = {name: arrays[name] for name in requested}
-        return arrays
+        crs = reader.header.parse_crs()
+        arrays = _query_window(reader, bbox=bbox, resolution=resolution, level=level, dimensions=dimensions)
+        return crs, arrays
