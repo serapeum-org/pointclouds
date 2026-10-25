@@ -277,6 +277,16 @@ class TestMerge:
         assert len(merged) == 4
         assert merged.classification.tolist() == [2, 5, 2, 6]
 
+    def test_merge_ignores_a_fresh_empty_clouds_crs(self):
+        """A programmatically built empty cloud (CRS None) is a no-op and does not veto on CRS either."""
+        empty = PointCloud(x=np.empty(0), y=np.empty(0), z=np.empty(0))
+        real = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2), crs="EPSG:28992")
+
+        merged = PointCloud.merge([empty, real])
+
+        assert len(merged) == 2
+        assert merged.crs.to_epsg() == 28992
+
     def test_merge_treats_a_missing_crs_as_a_conflict(self):
         """A cloud with a CRS and one without do not agree, so the merge is refused, not guessed."""
         known = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), crs="EPSG:28992")

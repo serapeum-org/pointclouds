@@ -53,11 +53,14 @@ def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
         raise ValueError("merge needs at least one cloud")
 
     point_counts = [c.x.shape[0] for c in clouds]  # also forces any lazy cloud to load
+    carrying = [c for c, count in zip(clouds, point_counts, strict=True) if count > 0]
     merged: dict[str, Any] = {
         "x": np.concatenate([c.x for c in clouds]),
         "y": np.concatenate([c.y for c in clouds]),
         "z": np.concatenate([c.z for c in clouds]),
-        "crs": _resolve_crs(clouds),
+        # A zero-point cloud contributes no points, so its CRS does not take part either (matching the attribute
+        # scoping below): resolve across the clouds that actually carry points, or None when none do.
+        "crs": _resolve_crs(carrying),
     }
 
     for name in _ATTRIBUTES:
@@ -80,7 +83,8 @@ def _resolve_crs(clouds: Sequence[PointCloud]) -> CRS | None:
     """Return the one CRS the clouds share, or raise when they disagree.
 
     ``None`` (no known SRS) is treated as a distinct value, so merging a cloud that has a CRS with one that does
-    not is a conflict rather than a silent guess.
+    not is a conflict rather than a silent guess. An empty sequence (e.g. only zero-point clouds) resolves to
+    ``None``.
     """
     distinct: list[CRS | None] = []
     for crs in (c.crs for c in clouds):
@@ -89,7 +93,7 @@ def _resolve_crs(clouds: Sequence[PointCloud]) -> CRS | None:
     if len(distinct) > 1:
         shown = ", ".join("None" if c is None else c.to_string() for c in distinct)
         raise ValueError(f"cannot merge clouds with conflicting CRSs: {{{shown}}}")
-    return distinct[0]
+    return distinct[0] if distinct else None
 
 
 def _crs_equal(a: CRS | None, b: CRS | None) -> bool:
