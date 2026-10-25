@@ -332,8 +332,10 @@ def read_window(
             exclusive with ``level``.
         level: an exact octree level, or a ``range`` of them, when a caller would rather name levels than a
             spacing. Mutually exclusive with ``resolution``.
-        dimensions: dimension names to read, case-insensitive. ``None`` reads every dimension the package maps
-            onto a :class:`~pointclouds.points.PointCloud` field.
+        dimensions: dimension names to return, case-insensitive. ``None`` returns every dimension the package
+            maps onto a :class:`~pointclouds.points.PointCloud` field. This selects what comes back, not what is
+            decompressed: laspy decompresses every selected point in full, and the dimensions not asked for are
+            dropped afterwards. It trims the result, not the read.
 
     Returns:
         A mapping of lower-case dimension name to array, under the same contract as
@@ -363,7 +365,7 @@ def read_window(
         >>> coarse["x"].size, coarse["classification"].size  # doctest: +SKIP
         (100, 100)
 
-        The two compose, and a dimension list trims what is decompressed per point:
+        The two compose, and a dimension list selects which arrays come back:
 
         >>> corner = read_window(  # doctest: +SKIP
         ...     "examples/data/sample.copc.laz",

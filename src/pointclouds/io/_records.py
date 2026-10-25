@@ -120,7 +120,8 @@ def extract(source: _RecordSource, requested: tuple[str, ...]) -> dict[str, np.n
         by any requested name.
 
     Examples:
-        Only the requested dimensions are read, which is what makes a partial read cheaper than a full one:
+        Only the requested dimensions come back in the mapping (laspy still decompresses the whole point; this
+        selects the result, not the read):
 
         >>> import laspy
         >>> import numpy as np
