@@ -374,6 +374,9 @@ class PointCloud:
     def merge(cls, clouds: Sequence[PointCloud]) -> PointCloud:
         """Concatenate several clouds into one, rejecting a mix of CRSs.
 
+        A zero-point cloud (for example one that filtered to empty) is a no-op participant: it contributes no
+        points and takes no part in resolving the CRS or which attributes are present.
+
         Args:
             clouds: the clouds to merge, in order. Each is loaded if its records are not in memory yet.
 

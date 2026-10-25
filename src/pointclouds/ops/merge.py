@@ -26,12 +26,16 @@ _ATTRIBUTES = ("intensity", "classification", "return_number")
 def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
     """Concatenate the clouds' arrays and resolve a single CRS.
 
+    A zero-point cloud is a no-op participant: it contributes no rows and takes no part in resolving the CRS or
+    in deciding which attributes are present, so it never turns a valid merge into a conflict.
+
     Args:
         clouds: the clouds to merge, in order; each is loaded if its records are not in memory yet.
 
     Returns:
         A mapping of ``PointCloud`` constructor keyword to value: ``x``/``y``/``z``, the ``crs``, and each
-        attribute that every cloud carries. An attribute no cloud carries is omitted.
+        attribute that every point-carrying cloud has. An attribute no cloud carries is omitted; the CRS is the
+        one shared by the point-carrying clouds, or ``None`` when none carry points.
 
     Raises:
         ValueError: when ``clouds`` is empty, when the clouds disagree on CRS, or when an attribute is present
