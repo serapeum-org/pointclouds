@@ -11,6 +11,11 @@ via :meth:`PointCloud.load`. The distinction that matters, and the reason ``coun
 
 - ``cloud.count`` is the header's point count - free, no records read.
 - ``len(cloud)`` is how many points are **in memory**, so on a lazy cloud it forces the read.
+
+Reading can also be **windowed** (T-16). :meth:`PointCloud.read_window` - and ``read_file(bbox=, resolution=)``,
+which delegates to it - asks a COPC file's octree for only the points inside a bounding box, or only a coarse
+enough level of detail, instead of decompressing the whole cloud and masking it afterwards. A windowed cloud is
+eager and carries no header, so its ``count`` and ``bounds`` describe the window rather than the file.
 """
 
 from __future__ import annotations
@@ -20,6 +25,7 @@ from pathlib import Path
 import numpy as np
 from pyproj import CRS
 
+from pointclouds.io import copc as _copc
 from pointclouds.io import las as _las
 
 __all__ = ["PointCloud"]
@@ -36,7 +42,8 @@ class PointCloud:
     """In-memory point cloud: parallel per-dimension arrays plus a CRS.
 
     The constructor builds an eager cloud from arrays already in hand. To read a file, use
-    :meth:`read_file`, which is header-first and loads records only when they are asked for.
+    :meth:`read_file`, which is header-first and loads records only when they are asked for, or
+    :meth:`read_window` to pull back only part of a COPC cloud.
 
     Attributes:
         x: ``(N,)`` float64 x-coordinates.
@@ -98,26 +105,44 @@ class PointCloud:
             raise ValueError(f"x/y/z must share a length; got {len(self._x)}, {len(self._y)}, {len(self._z)}")
 
     @classmethod
-    def read_file(cls, path: str | Path, *, lazy: bool = True) -> PointCloud:
-        """Open a LAS/LAZ file.
+    def read_file(
+        cls,
+        path: str | Path,
+        *,
+        lazy: bool = True,
+        bbox: tuple[float, float, float, float] | None = None,
+        resolution: float | None = None,
+        level: int | range | None = None,
+    ) -> PointCloud:
+        """Open a LAS/LAZ file, or a window onto a COPC one.
 
         Args:
             path: the file to read.
             lazy: when ``True`` (the default) only the header is read; the record arrays decompress on first
-                access. When ``False`` the records are read immediately.
+                access. When ``False`` the records are read immediately. It has no effect on a windowed read:
+                there, the window *is* the read.
+            bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS. Passing it makes this a windowed read, which
+                requires a COPC file - see :meth:`read_window`.
+            resolution: target point spacing; makes this a windowed read. Mutually exclusive with ``level``.
+            level: an exact octree level or a ``range`` of them; makes this a windowed read. Mutually exclusive
+                with ``resolution``.
 
         Returns:
-            A cloud carrying the file's header metadata, and - unless ``lazy`` - its points.
+            A cloud carrying the file's header metadata, and - unless ``lazy`` - its points. With a window,
+            whatever :meth:`read_window` returns.
 
         Raises:
             FileNotFoundError: when the path does not exist.
-            ValueError: when the suffix is neither ``.las`` nor ``.laz``.
+            ValueError: when the suffix is neither ``.las`` nor ``.laz``; or, for a windowed read, anything
+                :meth:`read_window` rejects.
 
         Examples:
             >>> cloud = PointCloud.read_file("examples/data/sample.laz")  # doctest: +SKIP
             >>> cloud.count, cloud.crs is not None  # header only - no records touched  # doctest: +SKIP
             (400, True)
         """
+        if bbox is not None or resolution is not None or level is not None:
+            return cls.read_window(path, bbox=bbox, resolution=resolution, level=level)
         header = _las.read_header(path)
         cloud = cls.__new__(cls)  # bypass __init__: a lazy cloud has a header but no arrays yet
         cloud._x = _EMPTY_F8
@@ -129,6 +154,55 @@ class PointCloud:
         cloud._source = Path(path)
         cloud._loaded = False
         return cloud if lazy else cloud.load()
+
+    @classmethod
+    def read_window(
+        cls,
+        source: _copc.Source,
+        *,
+        bbox: tuple[float, float, float, float] | None = None,
+        resolution: float | None = None,
+        level: int | range | None = None,
+    ) -> PointCloud:
+        """Read only part of a COPC cloud, using its octree instead of decompressing everything.
+
+        This is the path a large cloud is meant to be read through: ``bbox`` prunes the octree to the chunks
+        whose voxels overlap the box, and ``resolution`` stops the descent at the coarsest level that still
+        satisfies it. Reading the whole cloud and masking it afterwards costs the full decompression; this does
+        not.
+
+        The returned cloud is **eager and header-less**: :attr:`count` and :attr:`bounds` describe the points
+        actually read, not the file they came from. Use :func:`pointclouds.io.copc.read_header` for the file's
+        own count, bounds and root spacing.
+
+        Args:
+            source: the COPC file, as a path or an open file object. A file object is how a remote cloud is
+                read - open it with ``fsspec`` (the ``[cloud]`` extra) and pass it in.
+            bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS. 2-D: the full z range is kept.
+            resolution: target point spacing, in the data's units, measured against the octree's root spacing.
+                Mutually exclusive with ``level``.
+            level: an exact octree level, or a ``range`` of them. Mutually exclusive with ``resolution``.
+
+        Returns:
+            A cloud holding only the selected points, with the file's CRS. A window that selects nothing gives
+            an empty cloud, whose :attr:`count` is ``0``.
+
+        Raises:
+            FileNotFoundError: when the path does not exist.
+            ValueError: when the suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is
+                malformed; when ``resolution`` is not positive; or when ``resolution`` and ``level`` are both
+                given.
+
+        Examples:
+            >>> window = PointCloud.read_window(  # doctest: +SKIP
+            ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)
+            ... )
+            >>> window.count  # 121 of the file's 1600 points  # doctest: +SKIP
+            121
+        """
+        crs = _copc.read_header(source).crs
+        arrays = _copc.read_window(source, bbox=bbox, resolution=resolution, level=level)
+        return cls(crs=crs, **arrays)
 
     def load(self) -> PointCloud:
         """Read this cloud's record arrays if they are not in memory yet.

@@ -249,6 +249,8 @@ notebooks = { cmd = "pytest --nbval --nbval-lax --verbose docs/examples", descri
 doctest = { cmd = "pytest --doctest-modules src/pointclouds -p no:cacheprovider", description = "Run the src doctests" }
 typecheck = { cmd = "mypy src/pointclouds", description = "Type check the package" }
 sample-data = { cmd = "python examples/data/make_sample.py", description = "Regenerate the committed LAS/LAZ fixtures" }
+# laspy reads COPC but cannot write it, so the fixture is assembled by hand - see the script's own docstring.
+copc-sample-data = { cmd = "python examples/data/make_copc_sample.py", description = "Regenerate the committed COPC fixture" }
 build-dist = { cmd = "python -m build", description = "Build sdist and wheel for PyPI" }
 publish-pypi = { cmd = "twine upload --non-interactive --repository pypi dist/*", depends-on = ["build-dist"], description = "Build and upload package to PyPI" }
 cz-changelog = { cmd = "cz changelog", description = "Generate the changelog with commitizen" }

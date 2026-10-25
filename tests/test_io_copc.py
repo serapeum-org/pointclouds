@@ -1,0 +1,398 @@
+"""The COPC engine: header reads that touch no records, and windowed reads that really do prune the octree.
+
+These run against a committed COPC file with a known two-level octree (see `examples/data/make_copc_sample.py`):
+a root node holding every 16th point, then eight level-1 octants holding the rest. That shape is what makes the
+assertions below meaningful - a mocked reader could satisfy "returns fewer points" without ever skipping a
+chunk, which is the only thing a windowed read is for.
+"""
+
+from __future__ import annotations
+
+import io
+
+import numpy as np
+import pytest
+from pyproj import CRS
+
+from pointclouds import PointCloud
+from pointclouds.io import copc, las
+
+#: The fixture is a 40 x 40 grid at 2 m spacing - see examples/data/make_copc_sample.py.
+EXPECTED_COUNT = 1600
+EXPECTED_BOUNDS = (155000.0, 463000.0, 155078.0, 463078.0)
+#: Root spacing recorded in the COPC info VLR: the extent divided by the root's points-per-axis.
+EXPECTED_SPACING = 7.8
+#: Points in the root node (level 0) and in the eight level-1 octants.
+ROOT_COUNT = 100
+LEVEL_1_COUNT = 1500
+#: A 20 x 20 m box on the fixture's lower-left corner, and how many of the 1600 points fall inside it.
+CORNER_BBOX = (155000.0, 463000.0, 155020.0, 463020.0)
+CORNER_COUNT = 121
+
+
+def _count_queried_nodes(monkeypatch) -> list[int]:
+    """Record how many octree nodes each query ends up reading.
+
+    This is the measurement the whole feature rests on: a window is only worth having if it visits fewer nodes,
+    not merely if it returns fewer points.
+
+    Args:
+        monkeypatch: pytest's monkeypatch fixture.
+
+    Returns:
+        A list that gains one entry, the node count, per query performed.
+    """
+    import laspy.copc as laspy_copc
+
+    visited: list[int] = []
+    real_loader = laspy_copc.load_octree_for_query
+
+    def spy(*args, **kwargs):
+        nodes = real_loader(*args, **kwargs)
+        visited.append(len(nodes))
+        return nodes
+
+    monkeypatch.setattr(laspy_copc, "load_octree_for_query", spy)
+    return visited
+
+
+class TestHeader:
+    """`read_header` answers from the header and the COPC info VLR alone."""
+
+    def test_it_reports_count_bounds_crs_and_spacing(self, sample_copc):
+        """The header carries the point count, the bounding box, the CRS, and the octree's root spacing."""
+        info = copc.read_header(sample_copc)
+
+        assert info.count == EXPECTED_COUNT
+        assert info.bounds == pytest.approx(EXPECTED_BOUNDS)
+        assert isinstance(info.crs, CRS)
+        assert info.crs.to_epsg() == 28992
+        assert info.spacing == pytest.approx(EXPECTED_SPACING)
+        assert info.version == "1.4"
+        assert info.point_format == 6  # COPC is always point format 6, 7 or 8
+
+    def test_it_is_a_las_header_info(self, sample_copc):
+        """A COPC header is a LAS header with one field added, so anything typed on the base accepts it."""
+        assert isinstance(copc.read_header(sample_copc), las.LasHeaderInfo)
+
+    def test_it_lists_the_point_format_dimensions(self, sample_copc):
+        """Dimensions come from the point format, so the attribute fields are all declared."""
+        dimensions = {name.lower() for name in copc.read_header(sample_copc).dimensions}
+
+        assert {"x", "y", "z", "intensity", "classification", "return_number"} <= dimensions
+
+    def test_it_touches_no_point_records(self, sample_copc, monkeypatch):
+        """A header read must not run a query - the header-first contract the LAS engine keeps too.
+
+        Enforced by making the query path explode: if `read_header` ever reaches for it, this fails.
+        """
+
+        def explode(*args, **kwargs):
+            raise AssertionError("read_header must not query the octree")
+
+        monkeypatch.setattr(copc.laspy.CopcReader, "query", explode)
+
+        assert copc.read_header(sample_copc).count == EXPECTED_COUNT
+
+
+class TestIsCopc:
+    """`is_copc` separates an indexed cloud from a plain one without reading records."""
+
+    def test_a_copc_file_is_recognised(self, sample_copc):
+        """The fixture carries a COPC info VLR as its first VLR, so it is a COPC."""
+        assert copc.is_copc(sample_copc) is True
+
+    def test_a_plain_laz_is_not(self, sample_laz):
+        """A LAZ with no octree answers False rather than raising - that is the question being asked."""
+        assert copc.is_copc(sample_laz) is False
+
+    def test_a_las_suffix_is_an_error_not_a_no(self, sample_las):
+        """An uncompressed `.las` can never be COPC, so the suffix is refused instead of answered."""
+        with pytest.raises(ValueError, match="COPC is always LAZ-compressed"):
+            copc.is_copc(sample_las)
+
+
+class TestBoundingBoxWindow:
+    """`bbox=` reads a sub-box by pruning the octree to the chunks that overlap it."""
+
+    def test_no_window_reads_the_whole_cloud(self, sample_copc):
+        """With no argument the query spans the file: the honest default, and the expensive one."""
+        arrays = copc.read_window(sample_copc)
+
+        assert arrays["x"].size == EXPECTED_COUNT
+
+    def test_only_points_inside_the_box_come_back(self, sample_copc):
+        """Points are clipped to the box, not merely to the chunks overlapping it."""
+        arrays = copc.read_window(sample_copc, bbox=CORNER_BBOX)
+
+        xmin, ymin, xmax, ymax = CORNER_BBOX
+        assert arrays["x"].size == CORNER_COUNT
+        assert arrays["x"].min() >= xmin
+        assert arrays["x"].max() <= xmax
+        assert arrays["y"].min() >= ymin
+        assert arrays["y"].max() <= ymax
+
+    def test_it_reads_fewer_nodes_than_the_whole_file(self, sample_copc, monkeypatch):
+        """The point of the feature: a corner box must visit fewer octree nodes, not just return fewer points."""
+        visited = _count_queried_nodes(monkeypatch)
+
+        copc.read_window(sample_copc)
+        copc.read_window(sample_copc, bbox=CORNER_BBOX)
+
+        whole_file, windowed = visited
+        assert windowed < whole_file, f"a corner box visited {windowed} nodes, same as the {whole_file} for all"
+
+    def test_a_box_outside_the_data_reads_nothing(self, sample_copc):
+        """An empty window is empty arrays, not an error and not a missing key."""
+        arrays = copc.read_window(sample_copc, bbox=(0.0, 0.0, 1.0, 1.0))
+
+        assert arrays["x"].size == 0
+        assert arrays["classification"].size == 0
+
+    def test_the_box_is_two_dimensional(self, sample_copc):
+        """A box spanning x and y keeps the file's whole z range: elevation is not a read window."""
+        arrays = copc.read_window(sample_copc, bbox=EXPECTED_BOUNDS)
+
+        assert arrays["z"].size == EXPECTED_COUNT
+
+    def test_every_canonical_dimension_comes_back(self, sample_copc):
+        """A window returns the same dimension set, dtypes and alignment as a whole-file read."""
+        arrays = copc.read_window(sample_copc, bbox=CORNER_BBOX)
+
+        assert set(arrays) == {"x", "y", "z", "intensity", "classification", "return_number"}
+        assert all(values.shape == (CORNER_COUNT,) for values in arrays.values())
+        assert arrays["x"].dtype == np.float64
+        assert arrays["intensity"].dtype == np.uint16
+        assert arrays["classification"].dtype == np.uint8
+
+    def test_a_dimension_subset_is_honoured(self, sample_copc):
+        """Only the requested dimensions are returned, and the names are case-insensitive."""
+        arrays = copc.read_window(sample_copc, bbox=CORNER_BBOX, dimensions=("X", "Z"))
+
+        assert set(arrays) == {"x", "z"}
+        assert arrays["z"].shape == (CORNER_COUNT,)
+
+
+class TestResolutionAndLevel:
+    """`resolution=` and `level=` are the level-of-detail half of a window."""
+
+    def test_the_root_spacing_reads_the_root_alone(self, sample_copc):
+        """Asking for the spacing the root already has stops the descent there."""
+        arrays = copc.read_window(sample_copc, resolution=EXPECTED_SPACING)
+
+        assert arrays["x"].size == ROOT_COUNT
+
+    def test_a_fine_resolution_reads_everything(self, sample_copc):
+        """A resolution finer than the deepest level cannot prune, so the whole cloud comes back."""
+        arrays = copc.read_window(sample_copc, resolution=0.5)
+
+        assert arrays["x"].size == EXPECTED_COUNT
+
+    def test_a_coarse_read_is_thinned_not_cropped(self, sample_copc):
+        """The LOD claim: a coarse read covers the whole area sparsely, rather than a dense corner of it.
+
+        The root is a regular subsample, so its own extent stays within one sample step of the file's. A cropped
+        read would cover a fraction of each axis instead - a quarter, for one octant.
+        """
+        arrays = copc.read_window(sample_copc, resolution=EXPECTED_SPACING)
+
+        xmin, ymin, xmax, ymax = EXPECTED_BOUNDS
+        covered_x = (arrays["x"].max() - arrays["x"].min()) / (xmax - xmin)
+        covered_y = (arrays["y"].max() - arrays["y"].min()) / (ymax - ymin)
+
+        assert covered_x > 0.8, f"the coarse read spans only {covered_x:.0%} of the x extent"
+        assert covered_y > 0.8, f"the coarse read spans only {covered_y:.0%} of the y extent"
+        assert arrays["x"].min() == pytest.approx(xmin)
+        assert arrays["y"].min() == pytest.approx(ymin)
+
+    def test_an_exact_level_selects_only_that_level(self, sample_copc):
+        """`level=` names octree levels directly, and the levels partition the cloud."""
+        root = copc.read_window(sample_copc, level=0)
+        deeper = copc.read_window(sample_copc, level=1)
+
+        assert root["x"].size == ROOT_COUNT
+        assert deeper["x"].size == LEVEL_1_COUNT
+        assert root["x"].size + deeper["x"].size == EXPECTED_COUNT
+
+    def test_a_level_range_is_accepted(self, sample_copc):
+        """A range spanning both levels is the whole cloud."""
+        arrays = copc.read_window(sample_copc, level=range(0, 2))
+
+        assert arrays["x"].size == EXPECTED_COUNT
+
+    def test_a_coarse_read_visits_fewer_nodes(self, sample_copc, monkeypatch):
+        """Level pruning has to skip nodes, for the same reason a bounding box does."""
+        visited = _count_queried_nodes(monkeypatch)
+
+        copc.read_window(sample_copc)
+        copc.read_window(sample_copc, resolution=EXPECTED_SPACING)
+
+        whole_file, coarse = visited
+        assert coarse < whole_file
+
+    def test_a_box_and_a_resolution_compose(self, sample_copc):
+        """The two halves of a window are independent, so they can be asked for together."""
+        arrays = copc.read_window(sample_copc, bbox=CORNER_BBOX, resolution=EXPECTED_SPACING)
+
+        xmin, ymin, xmax, ymax = CORNER_BBOX
+        assert 0 < arrays["x"].size < CORNER_COUNT
+        assert arrays["x"].max() <= xmax
+        assert arrays["y"].max() <= ymax
+
+
+class TestRejections:
+    """What the engine refuses, and whether the message sends the caller somewhere useful."""
+
+    def test_a_plain_laz_cannot_be_windowed(self, sample_laz):
+        """A file with no octree is refused by name, pointing at the whole-file read that does work."""
+        with pytest.raises(ValueError, match="carries no COPC octree"):
+            copc.read_window(sample_laz, bbox=CORNER_BBOX)
+
+    def test_the_refusal_names_the_alternative(self, sample_laz):
+        """The error has to say what to do instead, or it just restates the failure."""
+        with pytest.raises(ValueError, match="read_file"):
+            copc.read_window(sample_laz)
+
+    def test_a_missing_file_names_the_path(self, tmp_path):
+        """A missing file raises FileNotFoundError naming the path, not a laspy internal error."""
+        with pytest.raises(FileNotFoundError, match="nope.laz"):
+            copc.read_window(tmp_path / "nope.laz")
+
+    def test_an_unsupported_suffix_is_refused(self, tmp_path):
+        """A non-LAZ suffix is refused before laspy is given a chance to guess."""
+        other = tmp_path / "cloud.ply"
+        other.write_bytes(b"")
+
+        with pytest.raises(ValueError, match="not a COPC file"):
+            copc.read_window(other)
+
+    def test_a_bbox_needs_four_values(self, sample_copc):
+        """Three values is a mistake worth catching before the query runs."""
+        with pytest.raises(ValueError, match="bbox must be"):
+            copc.read_window(sample_copc, bbox=(1.0, 2.0, 3.0))
+
+    def test_an_inverted_bbox_is_refused(self, sample_copc):
+        """Swapped corners would silently select nothing, so they are an error instead."""
+        with pytest.raises(ValueError, match="bbox is inverted"):
+            copc.read_window(sample_copc, bbox=(155020.0, 463000.0, 155000.0, 463020.0))
+
+    @pytest.mark.parametrize("resolution", [0.0, -1.0])
+    def test_resolution_must_be_positive(self, sample_copc, resolution):
+        """A zero or negative spacing has no meaning as a target resolution."""
+        with pytest.raises(ValueError, match="resolution must be positive"):
+            copc.read_window(sample_copc, resolution=resolution)
+
+    def test_a_negative_level_is_refused(self, sample_copc):
+        """Octree levels start at 0 at the root."""
+        with pytest.raises(ValueError, match="non-negative octree level"):
+            copc.read_window(sample_copc, level=-1)
+
+    def test_resolution_and_level_are_mutually_exclusive(self, sample_copc):
+        """They are two spellings of the same limit; accepting both would hide which one won."""
+        with pytest.raises(ValueError, match="not both"):
+            copc.read_window(sample_copc, resolution=1.0, level=1)
+
+    def test_an_unknown_dimension_is_refused(self, sample_copc):
+        """An unknown dimension fails loudly, listing what the engine does read."""
+        with pytest.raises(KeyError, match="unknown dimension"):
+            copc.read_window(sample_copc, dimensions=("X", "nosuchdim"))
+
+
+class TestFileObjectSource:
+    """A window can be read from an open handle, which is how a remote cloud is reached."""
+
+    def test_a_file_object_reads_the_same_window(self, sample_copc):
+        """Bytes in memory behave exactly like the path they came from."""
+        handle = io.BytesIO(sample_copc.read_bytes())
+
+        arrays = copc.read_window(handle, bbox=CORNER_BBOX)
+
+        assert arrays["x"].size == CORNER_COUNT
+
+    def test_the_caller_keeps_the_handle(self, sample_copc):
+        """laspy would close a handle it was handed; a handle the caller opened is the caller's to close."""
+        handle = io.BytesIO(sample_copc.read_bytes())
+
+        copc.read_window(handle, bbox=CORNER_BBOX)
+
+        assert not handle.closed
+
+    def test_one_handle_serves_several_reads(self, sample_copc):
+        """Each read rewinds, so a header read followed by a window read does not start mid-file."""
+        handle = io.BytesIO(sample_copc.read_bytes())
+
+        assert copc.read_header(handle).count == EXPECTED_COUNT
+        assert copc.read_window(handle, bbox=CORNER_BBOX)["x"].size == CORNER_COUNT
+        assert copc.read_header(handle).count == EXPECTED_COUNT
+
+
+class TestPointCloudWindow:
+    """The container surface: `PointCloud.read_window`, and `read_file` delegating to it."""
+
+    def test_a_window_is_a_cloud_of_only_those_points(self, sample_copc):
+        """The returned cloud holds the window, with the file's CRS."""
+        cloud = PointCloud.read_window(sample_copc, bbox=CORNER_BBOX)
+
+        assert cloud.count == CORNER_COUNT
+        assert len(cloud) == CORNER_COUNT
+        assert cloud.crs.to_epsg() == 28992
+
+    def test_count_and_bounds_describe_the_window_not_the_file(self, sample_copc):
+        """A windowed cloud carries no header, so it cannot report the file's 1600 points as its own."""
+        cloud = PointCloud.read_window(sample_copc, bbox=CORNER_BBOX)
+
+        assert cloud.count != EXPECTED_COUNT
+        assert cloud.bounds == pytest.approx(CORNER_BBOX)
+
+    def test_a_window_is_eager(self, sample_copc):
+        """There is nothing left to load: the window was the read."""
+        cloud = PointCloud.read_window(sample_copc, bbox=CORNER_BBOX)
+
+        assert cloud.loaded is True
+        assert cloud.source is None
+
+    def test_every_record_array_is_reachable(self, sample_copc):
+        """The attribute arrays arrive aligned with the coordinates, as on any other cloud."""
+        cloud = PointCloud.read_window(sample_copc, bbox=CORNER_BBOX)
+
+        assert cloud.intensity.shape == (CORNER_COUNT,)
+        assert cloud.classification.shape == (CORNER_COUNT,)
+        assert cloud.return_number.shape == (CORNER_COUNT,)
+        assert cloud.to_array(("X", "Y", "Z")).shape == (CORNER_COUNT, 3)
+
+    def test_an_empty_window_is_an_empty_cloud(self, sample_copc):
+        """Zero points is a valid answer; only asking such a cloud for bounds is not."""
+        cloud = PointCloud.read_window(sample_copc, bbox=(0.0, 0.0, 1.0, 1.0))
+
+        assert cloud.count == 0
+        with pytest.raises(ValueError, match="no bounds"):
+            _ = cloud.bounds
+
+    @pytest.mark.parametrize(
+        "kwargs",
+        [
+            {"bbox": CORNER_BBOX},
+            {"resolution": EXPECTED_SPACING},
+            {"level": 0},
+        ],
+    )
+    def test_read_file_delegates_any_window_argument(self, sample_copc, kwargs):
+        """`read_file(bbox=)` / `(resolution=)` / `(level=)` must land on the same path as `read_window`."""
+        via_read_file = PointCloud.read_file(sample_copc, **kwargs)
+        direct = PointCloud.read_window(sample_copc, **kwargs)
+
+        assert via_read_file.count == direct.count
+        assert via_read_file.loaded is True
+
+    def test_read_file_without_a_window_is_still_header_first(self, sample_copc, monkeypatch):
+        """A COPC file read with no window keeps the lazy LAS path: it is a valid LAZ, after all."""
+
+        def explode(*args, **kwargs):
+            raise AssertionError("a header-first read must not decompress records")
+
+        monkeypatch.setattr(copc.laspy, "read", explode)
+
+        cloud = PointCloud.read_file(sample_copc)
+
+        assert cloud.loaded is False
+        assert cloud.count == EXPECTED_COUNT

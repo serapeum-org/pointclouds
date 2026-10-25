@@ -29,6 +29,10 @@ cloud = pc.PointCloud.read_file("survey.laz")
 cloud.crs, cloud.bounds, cloud.count          # from the header, no record read
 xyz = cloud.to_array(("X", "Y", "Z"))         # (N, 3) float64
 
+# COPC: read a window instead of the whole cloud - only the chunks that overlap are decompressed
+box = pc.PointCloud.read_window("survey.copc.laz", bbox=(155000, 463000, 156000, 464000))
+coarse = pc.PointCloud.read_window("survey.copc.laz", resolution=5.0)   # ~one point per 5 m
+
 ground = cloud.filter(classification=2)
 thin = ground.decimate(target=2_000_000, method="random")
 

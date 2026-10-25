@@ -24,19 +24,25 @@ from pyproj import CRS
 SIDE = 20
 #: Spacing in metres between neighbouring points.
 SPACING = 2.0
+#: EPSG code the fixtures are written in: Amersfoort / RD New.
+EPSG = 28992
 #: Lower-left corner in EPSG:28992, roughly central Netherlands.
 ORIGIN = (155000.0, 463000.0)
 
 
-def build_arrays() -> dict[str, np.ndarray]:
+def build_arrays(side: int = SIDE) -> dict[str, np.ndarray]:
     """Build the fixture's point arrays.
+
+    Args:
+        side: points per axis. The default keeps ``sample.las`` / ``sample.laz`` exactly as committed; the COPC
+            fixture asks for a denser grid so its octree has something to split.
 
     Returns:
         A mapping of dimension name to array: ``x``, ``y``, ``z``, ``intensity``, ``classification`` and
-        ``return_number``, each of length ``SIDE * SIDE``.
+        ``return_number``, each of length ``side * side``.
     """
     rng = np.random.default_rng(20261015)
-    cols, rows = np.meshgrid(np.arange(SIDE), np.arange(SIDE), indexing="xy")
+    cols, rows = np.meshgrid(np.arange(side), np.arange(side), indexing="xy")
     x = ORIGIN[0] + cols.ravel() * SPACING
     y = ORIGIN[1] + rows.ravel() * SPACING
 
@@ -69,7 +75,7 @@ def write(path: Path, arrays: dict[str, np.ndarray]) -> None:
     header = laspy.LasHeader(version="1.4", point_format=3)
     header.scales = np.array([0.01, 0.01, 0.01])
     header.offsets = np.array([ORIGIN[0], ORIGIN[1], 0.0])
-    header.add_crs(CRS.from_epsg(28992))
+    header.add_crs(CRS.from_epsg(EPSG))
 
     las = laspy.LasData(header)
     las.x = arrays["x"]
