@@ -2,42 +2,42 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/AUTHORS/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/CODE_OF_CONDUCT/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/change-log/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/contributing/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/installation/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/adr/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/adr/0001-separate-distribution/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/reference/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
     <url>
          <loc>https://serapeum-org.github.io/pointclouds/develop/tutorials/</loc>
-         <lastmod>2026-10-15</lastmod>
+         <lastmod>2026-10-25</lastmod>
     </url>
 </urlset>
