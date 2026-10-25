@@ -224,3 +224,19 @@ class TestReadWindowDimensions:
         assert set(_records.CANONICAL) == params, (
             f"CANONICAL {sorted(_records.CANONICAL)} drifted from ctor params {sorted(params)}"
         )
+
+
+class TestReadFileWindowGuards:
+    """read_file's window delegation: lazy is meaningless with a window, and should not be silently ignored (L7)."""
+
+    def test_explicit_lazy_with_a_window_is_refused(self, sample_copc):
+        """`lazy=` and a window contradict each other - a windowed read is always eager, so say so."""
+        with pytest.raises(ValueError, match="lazy"):
+            PointCloud.read_file(sample_copc, lazy=False, bbox=(155000, 463000, 155020, 463020))
+
+    def test_a_window_without_lazy_still_works(self, sample_copc):
+        """Omitting `lazy` (the normal case) delegates to the window read unchanged."""
+        cloud = PointCloud.read_file(sample_copc, bbox=(155000, 463000, 155020, 463020))
+
+        assert cloud.count == 121
+        assert cloud.loaded is True

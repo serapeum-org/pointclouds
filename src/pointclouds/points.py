@@ -109,7 +109,7 @@ class PointCloud:
         cls,
         path: str | Path,
         *,
-        lazy: bool = True,
+        lazy: bool | None = None,
         bbox: tuple[float, float, float, float] | None = None,
         resolution: float | None = None,
         level: int | range | None = None,
@@ -117,10 +117,13 @@ class PointCloud:
         """Open a LAS/LAZ file, or a window onto a COPC one.
 
         Args:
-            path: the file to read.
-            lazy: when ``True`` (the default) only the header is read; the record arrays decompress on first
-                access. When ``False`` the records are read immediately. It has no effect on a windowed read:
-                there, the window *is* the read.
+            path: the file to read. A path only - to read a window from an open file object (an ``fsspec``
+                handle), call :meth:`read_window` directly; the LAS/LAZ engine behind the non-windowed read
+                takes a path.
+            lazy: when left unset or ``True`` only the header is read and the record arrays decompress on first
+                access; ``False`` reads the records immediately. It has no meaning for a windowed read, where
+                the window *is* the read, so passing it together with ``bbox`` / ``resolution`` / ``level`` is
+                refused rather than silently ignored.
             bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS. Passing it makes this a windowed read, which
                 requires a COPC file - see :meth:`read_window`.
             resolution: target point spacing; makes this a windowed read. Mutually exclusive with ``level``.
@@ -128,13 +131,13 @@ class PointCloud:
                 with ``resolution``.
 
         Returns:
-            A cloud carrying the file's header metadata, and - unless ``lazy`` - its points. With a window,
-            whatever :meth:`read_window` returns.
+            A cloud carrying the file's header metadata, and - unless ``lazy`` is ``False`` - its points. With a
+            window, whatever :meth:`read_window` returns.
 
         Raises:
             FileNotFoundError: when the path does not exist.
-            ValueError: when the suffix is neither ``.las`` nor ``.laz``; or, for a windowed read, anything
-                :meth:`read_window` rejects.
+            ValueError: when the suffix is neither ``.las`` nor ``.laz``; when ``lazy`` is passed together with a
+                window argument; or, for a windowed read, anything :meth:`read_window` rejects.
 
         Examples:
             Without a window the read is header-first: the metadata costs nothing and the records wait:
@@ -154,6 +157,8 @@ class PointCloud:
             (121, True)
         """
         if bbox is not None or resolution is not None or level is not None:
+            if lazy is not None:
+                raise ValueError("lazy has no meaning with a window; a windowed read is always eager")
             return cls.read_window(path, bbox=bbox, resolution=resolution, level=level)
         header = _las.read_header(path)
         cloud = cls.__new__(cls)  # bypass __init__: a lazy cloud has a header but no arrays yet
@@ -165,7 +170,8 @@ class PointCloud:
         cloud._header = header
         cloud._source = Path(path)
         cloud._loaded = False
-        return cloud if lazy else cloud.load()
+        # lazy is None when unset, which means lazy; only an explicit lazy=False forces an eager load.
+        return cloud.load() if lazy is False else cloud
 
     @classmethod
     def read_window(
