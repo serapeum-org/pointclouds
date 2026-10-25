@@ -364,6 +364,8 @@ class PointCloud:
 
         Raises:
             KeyError: when a requested dimension is not one this container holds.
+            ValueError: when a requested dimension is empty (the file/caller carried none of it) while others
+                are populated, which would otherwise surface as an opaque numpy broadcast error.
         """
         self.load()
         lookup = {"x": self._x, "y": self._y, "z": self._z, **self._attributes}
@@ -371,6 +373,13 @@ class PointCloud:
             cols = [np.asarray(lookup[name.lower()], dtype=float) for name in dimensions]
         except KeyError as exc:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
+        width = len(self._x)
+        empty = [name for name, col in zip(dimensions, cols) if col.size != width]
+        if empty:
+            raise ValueError(
+                f"cannot stack dimension(s) {empty} - this cloud carries none of them ({width} points, but "
+                f"those arrays are empty); request only the dimensions it holds"
+            )
         return np.column_stack(cols)
 
     def __len__(self) -> int:

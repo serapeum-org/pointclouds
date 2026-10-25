@@ -240,3 +240,14 @@ class TestReadFileWindowGuards:
 
         assert cloud.count == 121
         assert cloud.loaded is True
+
+
+class TestToArrayEmptyDimension:
+    """Stacking a present dimension with an absent one must name the problem, not leak a numpy error (L5)."""
+
+    def test_an_empty_attribute_raises_a_named_error(self):
+        """A 3-point cloud with no intensity, asked for X+intensity, says which dimension is empty."""
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3))
+
+        with pytest.raises(ValueError, match="intensity"):
+            cloud.to_array(("X", "intensity"))
