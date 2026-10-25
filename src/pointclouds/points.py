@@ -283,11 +283,37 @@ class PointCloud:
                 ``True`` but the source or target CRS carries no vertical axis.
 
         Examples:
-            >>> import numpy as np
-            >>> cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1), crs="EPSG:28992")
-            >>> utm = cloud.to_crs("EPSG:32631")
-            >>> utm.crs.to_epsg()
-            32631
+            - Reproject a Dutch RD New cloud into UTM zone 31N; the result reports the target CRS:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1),
+                ...                    crs="EPSG:28992")
+                >>> utm = cloud.to_crs("EPSG:32631")
+                >>> utm.crs.to_epsg()
+                32631
+
+                ```
+            - ``always_xy=True`` means longitude lands in ``x`` and latitude in ``y`` even for EPSG:4326,
+              whose registry order is lat/lon:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1),
+                ...                    crs="EPSG:28992")
+                >>> wgs = cloud.to_crs("EPSG:4326")
+                >>> round(float(wgs.x[0]), 2), round(float(wgs.y[0]), 2)
+                (5.39, 52.16)
+
+                ```
+            - A cloud with no CRS has nothing to transform from, so it refuses:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1))
+                >>> cloud.to_crs("EPSG:4326")
+                Traceback (most recent call last):
+                    ...
+                ValueError: cannot reproject a cloud whose crs is None; set a source CRS first
+
+                ```
         """
         if self._crs is None:
             raise ValueError("cannot reproject a cloud whose crs is None; set a source CRS first")
