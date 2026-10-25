@@ -46,6 +46,16 @@ def clip_mask(
     Raises:
         ValueError: when neither or both of ``bbox`` and ``polygon`` are given, or when ``polygon`` is not an
             ``(M, 2)`` array of at least three vertices.
+
+    Examples:
+        >>> import numpy as np
+        >>> from pointclouds import PointCloud
+        >>> cloud = PointCloud(x=np.array([0.0, 2.0]), y=np.array([0.0, 2.0]), z=np.zeros(2))
+        >>> clip_mask(cloud, bbox=(1.0, 1.0, 3.0, 3.0)).tolist()
+        [False, True]
+        >>> ring = np.array([[1.0, 1.0], [1.0, 3.0], [3.0, 3.0], [3.0, 1.0]])
+        >>> clip_mask(cloud, polygon=ring).tolist()
+        [False, True]
     """
     if (bbox is None) == (polygon is None):
         raise ValueError("clip needs exactly one of bbox or polygon")

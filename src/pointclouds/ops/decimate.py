@@ -42,6 +42,16 @@ def select_indices(
     Raises:
         ValueError: when the arguments for the chosen method are missing, ambiguous, or out of range, or when
             ``method`` is neither ``"random"`` nor ``"voxel"``.
+
+    Examples:
+        >>> import numpy as np
+        >>> from pointclouds import PointCloud
+        >>> cloud = PointCloud(x=np.arange(10.0), y=np.zeros(10), z=np.zeros(10))
+        >>> len(select_indices(cloud, target=3, seed=0))
+        3
+        >>> line = PointCloud(x=np.array([0.0, 0.5, 1.0, 1.5]), y=np.zeros(4), z=np.zeros(4))
+        >>> select_indices(line, method="voxel", voxel_size=1.0).tolist()
+        [0, 2]
     """
     n = cloud.x.shape[0]  # forces a lazy cloud to load
 

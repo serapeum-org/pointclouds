@@ -36,6 +36,17 @@ def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
     Raises:
         ValueError: when ``clouds`` is empty, when the clouds disagree on CRS, or when an attribute is present
             on some clouds but absent on others (so the concatenation would misalign).
+
+    Examples:
+        >>> import numpy as np
+        >>> from pointclouds import PointCloud
+        >>> a = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2))
+        >>> b = PointCloud(x=np.ones(3), y=np.zeros(3), z=np.zeros(3))
+        >>> arrays = merge_arrays([a, b])
+        >>> arrays["x"].tolist()
+        [0.0, 0.0, 1.0, 1.0, 1.0]
+        >>> sorted(arrays)
+        ['crs', 'x', 'y', 'z']
     """
     clouds = list(clouds)
     if not clouds:

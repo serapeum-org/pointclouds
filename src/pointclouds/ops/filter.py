@@ -36,6 +36,13 @@ def bbox_mask(x: np.ndarray, y: np.ndarray, bbox: tuple[float, float, float, flo
 
     Raises:
         ValueError: when ``bbox`` is not four numbers with ``xmin <= xmax`` and ``ymin <= ymax``.
+
+    Examples:
+        >>> import numpy as np
+        >>> x = np.array([0.0, 5.0, 9.0])
+        >>> y = np.array([0.0, 0.0, 0.0])
+        >>> bbox_mask(x, y, (4.0, -1.0, 10.0, 1.0)).tolist()
+        [False, True, True]
     """
     xmin, ymin, xmax, ymax = bbox
     if xmin > xmax or ymin > ymax:
@@ -70,6 +77,18 @@ def build_mask(
     Raises:
         ValueError: when a criterion names an attribute the cloud does not carry (an empty array), or when
             ``bbox`` is malformed.
+
+    Examples:
+        >>> import numpy as np
+        >>> from pointclouds import PointCloud
+        >>> cloud = PointCloud(
+        ...     x=np.arange(4.0), y=np.zeros(4), z=np.zeros(4),
+        ...     classification=np.array([2, 5, 2, 6], dtype=np.uint8),
+        ... )
+        >>> build_mask(cloud, classification=2).tolist()
+        [True, False, True, False]
+        >>> build_mask(cloud, classification=[2, 6], bbox=(1.0, -1.0, 3.0, 1.0)).tolist()
+        [False, False, True, True]
     """
     n = cloud.x.shape[0]  # also forces a lazy cloud to load, so every array below is populated
     mask = np.ones(n, dtype=bool)
