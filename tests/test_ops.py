@@ -44,6 +44,17 @@ class TestFilter:
 
         assert kept.classification.tolist() == [2, 2, 6]
 
+    def test_intensity_is_a_membership_criterion_too(self, attributed_cloud):
+        """intensity filters by membership, exactly like the other attribute criteria."""
+        kept = attributed_cloud.filter(intensity=200)
+
+        assert kept.x.tolist() == [1.0]
+
+    def test_a_malformed_bbox_is_refused(self, attributed_cloud):
+        """A bbox whose min exceeds its max is refused rather than silently emptied."""
+        with pytest.raises(ValueError, match="min <= max"):
+            attributed_cloud.filter(bbox=(2.0, 0.0, 1.0, 1.0))
+
     def test_criteria_are_anded_together(self, attributed_cloud):
         """Each criterion narrows the result; here class 2 AND return number 2 leaves one point."""
         kept = attributed_cloud.filter(classification=2, return_number=2)
@@ -113,6 +124,26 @@ class TestDecimate:
 
         with pytest.raises(ValueError, match="exactly one of target or fraction"):
             cloud.decimate(target=2, fraction=0.5)
+
+    def test_a_negative_target_is_refused(self):
+        """A target cannot be negative."""
+        cloud = PointCloud(x=np.arange(4.0), y=np.zeros(4), z=np.zeros(4))
+
+        with pytest.raises(ValueError, match="target must be non-negative"):
+            cloud.decimate(target=-1)
+
+    def test_a_fraction_out_of_range_is_refused(self):
+        """A fraction must fall in (0, 1]."""
+        cloud = PointCloud(x=np.arange(4.0), y=np.zeros(4), z=np.zeros(4))
+
+        with pytest.raises(ValueError, match=r"fraction must be in \(0, 1\]"):
+            cloud.decimate(fraction=1.5)
+
+    def test_voxel_thinning_an_empty_cloud_is_empty(self):
+        """Voxel thinning a cloud with no points yields an empty cloud, not an error."""
+        empty = PointCloud(x=np.empty(0), y=np.empty(0), z=np.empty(0))
+
+        assert len(empty.decimate(method="voxel", voxel_size=1.0)) == 0
 
     def test_voxel_keeps_one_point_per_cube(self):
         """Points sharing a voxel collapse to the first of them, in point order."""
@@ -224,6 +255,14 @@ class TestMerge:
         with pytest.raises(ValueError, match="at least one cloud"):
             PointCloud.merge([])
 
+    def test_merge_treats_a_missing_crs_as_a_conflict(self):
+        """A cloud with a CRS and one without do not agree, so the merge is refused, not guessed."""
+        known = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), crs="EPSG:28992")
+        unknown = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1))
+
+        with pytest.raises(ValueError, match="conflicting CRSs"):
+            PointCloud.merge([known, unknown])
+
 
 @pytest.fixture
 def grid_cloud() -> PointCloud:
@@ -333,3 +372,24 @@ class TestToGrid:
         """Only bin and radius exist."""
         with pytest.raises(ValueError, match="unknown mode"):
             grid_cloud.to_grid(cell_size=1.0, mode="kriging", bounds=self.BOUNDS)
+
+    def test_a_percentile_out_of_range_is_refused(self, grid_cloud):
+        """A p<n> whose n is above 100 is refused."""
+        with pytest.raises(ValueError, match="percentile out of range"):
+            grid_cloud.to_grid(cell_size=1.0, aggregate="p150", bounds=self.BOUNDS)
+
+    def test_percentile_of_an_empty_grid_is_all_nodata(self):
+        """A percentile grid with no points in the extent is entirely nodata, not an error."""
+        cloud = PointCloud(x=np.array([9.0]), y=np.array([9.0]), z=np.array([1.0]))
+
+        array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="p50", bounds=(0.0, 0.0, 2.0, 2.0))
+
+        assert np.isnan(array).all()
+
+    def test_points_outside_the_bounds_are_dropped(self):
+        """In bin mode a point beyond the grid extent contributes to no cell."""
+        cloud = PointCloud(x=np.array([0.5, 9.0]), y=np.array([0.5, 9.0]), z=np.array([1.0, 2.0]))
+
+        array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="count", bounds=(0.0, 0.0, 2.0, 2.0))
+
+        assert array.sum() == 1.0
