@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -7899,8 +7899,10 @@ spacing. Mutually exclusive with <code>resolution</code>.</p>
             </td>
             <td>
               <div class="doc-md-description">
-                <p>dimension names to read, case-insensitive. <code>None</code> reads every dimension the package maps
-onto a :class:<code>~pointclouds.points.PointCloud</code> field.</p>
+                <p>dimension names to return, case-insensitive. <code>None</code> returns every dimension the package
+maps onto a :class:<code>~pointclouds.points.PointCloud</code> field. This selects what comes back, not what is
+decompressed: laspy decompresses every selected point in full, and the dimensions not asked for are
+dropped afterwards. It trims the result, not the read.</p>
               </div>
             </td>
             <td>
@@ -8022,7 +8024,7 @@ and <code>level</code> are both given.</p>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">coarse</span><span class="p">[</span><span class="s2">"x"</span><span class="p">]</span><span class="o">.</span><span class="n">size</span><span class="p">,</span> <span class="n">coarse</span><span class="p">[</span><span class="s2">"classification"</span><span class="p">]</span><span class="o">.</span><span class="n">size</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="go">(100, 100)</span>
 </code></pre></div>
-    <p>The two compose, and a dimension list trims what is decompressed per point:</p>
+    <p>The two compose, and a dimension list selects which arrays come back:</p>
     <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="gp">&gt;&gt;&gt; </span><span class="n">corner</span> <span class="o">=</span> <span class="n">read_window</span><span class="p">(</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="gp">... </span>    <span class="s2">"examples/data/sample.copc.laz"</span><span class="p">,</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="gp">... </span>    <span class="n">bbox</span><span class="o">=</span><span class="p">(</span><span class="mi">155000</span><span class="p">,</span> <span class="mi">463000</span><span class="p">,</span> <span class="mi">155020</span><span class="p">,</span> <span class="mi">463020</span><span class="p">),</span>
@@ -8120,7 +8122,9 @@ and <code>level</code> are both given.</p>
 <span class="normal"><a href="#__codelineno-0-392">392</a></span>
 <span class="normal"><a href="#__codelineno-0-393">393</a></span>
 <span class="normal"><a href="#__codelineno-0-394">394</a></span>
-<span class="normal"><a href="#__codelineno-0-395">395</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-311" name="__codelineno-0-311"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_window</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-395">395</a></span>
+<span class="normal"><a href="#__codelineno-0-396">396</a></span>
+<span class="normal"><a href="#__codelineno-0-397">397</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-311" name="__codelineno-0-311"></a><span class="k">def</span><span class="w"> </span><span class="nf">read_window</span><span class="p">(</span>
 <a id="__codelineno-0-312" name="__codelineno-0-312"></a>    <span class="n">source</span><span class="p">:</span> <span class="n">Source</span><span class="p">,</span>
 <a id="__codelineno-0-313" name="__codelineno-0-313"></a>    <span class="o">*</span><span class="p">,</span>
 <a id="__codelineno-0-314" name="__codelineno-0-314"></a>    <span class="n">bbox</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -8144,67 +8148,69 @@ and <code>level</code> are both given.</p>
 <a id="__codelineno-0-332" name="__codelineno-0-332"></a><span class="sd">            exclusive with ``level``.</span>
 <a id="__codelineno-0-333" name="__codelineno-0-333"></a><span class="sd">        level: an exact octree level, or a ``range`` of them, when a caller would rather name levels than a</span>
 <a id="__codelineno-0-334" name="__codelineno-0-334"></a><span class="sd">            spacing. Mutually exclusive with ``resolution``.</span>
-<a id="__codelineno-0-335" name="__codelineno-0-335"></a><span class="sd">        dimensions: dimension names to read, case-insensitive. ``None`` reads every dimension the package maps</span>
-<a id="__codelineno-0-336" name="__codelineno-0-336"></a><span class="sd">            onto a :class:`~pointclouds.points.PointCloud` field.</span>
-<a id="__codelineno-0-337" name="__codelineno-0-337"></a>
-<a id="__codelineno-0-338" name="__codelineno-0-338"></a><span class="sd">    Returns:</span>
-<a id="__codelineno-0-339" name="__codelineno-0-339"></a><span class="sd">        A mapping of lower-case dimension name to array, under the same contract as</span>
-<a id="__codelineno-0-340" name="__codelineno-0-340"></a><span class="sd">        :func:`pointclouds.io.las.read_points`: a dimension the point format does not declare comes back as a</span>
-<a id="__codelineno-0-341" name="__codelineno-0-341"></a><span class="sd">        zero-length array, never as a missing key. A window that selects nothing gives zero-length arrays</span>
-<a id="__codelineno-0-342" name="__codelineno-0-342"></a><span class="sd">        throughout.</span>
-<a id="__codelineno-0-343" name="__codelineno-0-343"></a>
-<a id="__codelineno-0-344" name="__codelineno-0-344"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-345" name="__codelineno-0-345"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
-<a id="__codelineno-0-346" name="__codelineno-0-346"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is</span>
-<a id="__codelineno-0-347" name="__codelineno-0-347"></a><span class="sd">            malformed; when ``resolution`` is not positive; when ``level`` is negative; or when ``resolution``</span>
-<a id="__codelineno-0-348" name="__codelineno-0-348"></a><span class="sd">            and ``level`` are both given.</span>
-<a id="__codelineno-0-349" name="__codelineno-0-349"></a><span class="sd">        KeyError: when a requested dimension is not one this package reads.</span>
-<a id="__codelineno-0-350" name="__codelineno-0-350"></a>
-<a id="__codelineno-0-351" name="__codelineno-0-351"></a><span class="sd">    Examples:</span>
-<a id="__codelineno-0-352" name="__codelineno-0-352"></a><span class="sd">        A bounding box reads a corner of the cloud, fetching only the chunks that reach into it:</span>
-<a id="__codelineno-0-353" name="__codelineno-0-353"></a>
-<a id="__codelineno-0-354" name="__codelineno-0-354"></a><span class="sd">        &gt;&gt;&gt; arrays = read_window(  # doctest: +SKIP</span>
-<a id="__codelineno-0-355" name="__codelineno-0-355"></a><span class="sd">        ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)</span>
-<a id="__codelineno-0-356" name="__codelineno-0-356"></a><span class="sd">        ... )</span>
-<a id="__codelineno-0-357" name="__codelineno-0-357"></a><span class="sd">        &gt;&gt;&gt; arrays["x"].size  # 121 of the file's 1600 points  # doctest: +SKIP</span>
-<a id="__codelineno-0-358" name="__codelineno-0-358"></a><span class="sd">        121</span>
-<a id="__codelineno-0-359" name="__codelineno-0-359"></a>
-<a id="__codelineno-0-360" name="__codelineno-0-360"></a><span class="sd">        A resolution reads the whole extent sparsely instead, which is what a zoomed-out view wants:</span>
+<a id="__codelineno-0-335" name="__codelineno-0-335"></a><span class="sd">        dimensions: dimension names to return, case-insensitive. ``None`` returns every dimension the package</span>
+<a id="__codelineno-0-336" name="__codelineno-0-336"></a><span class="sd">            maps onto a :class:`~pointclouds.points.PointCloud` field. This selects what comes back, not what is</span>
+<a id="__codelineno-0-337" name="__codelineno-0-337"></a><span class="sd">            decompressed: laspy decompresses every selected point in full, and the dimensions not asked for are</span>
+<a id="__codelineno-0-338" name="__codelineno-0-338"></a><span class="sd">            dropped afterwards. It trims the result, not the read.</span>
+<a id="__codelineno-0-339" name="__codelineno-0-339"></a>
+<a id="__codelineno-0-340" name="__codelineno-0-340"></a><span class="sd">    Returns:</span>
+<a id="__codelineno-0-341" name="__codelineno-0-341"></a><span class="sd">        A mapping of lower-case dimension name to array, under the same contract as</span>
+<a id="__codelineno-0-342" name="__codelineno-0-342"></a><span class="sd">        :func:`pointclouds.io.las.read_points`: a dimension the point format does not declare comes back as a</span>
+<a id="__codelineno-0-343" name="__codelineno-0-343"></a><span class="sd">        zero-length array, never as a missing key. A window that selects nothing gives zero-length arrays</span>
+<a id="__codelineno-0-344" name="__codelineno-0-344"></a><span class="sd">        throughout.</span>
+<a id="__codelineno-0-345" name="__codelineno-0-345"></a>
+<a id="__codelineno-0-346" name="__codelineno-0-346"></a><span class="sd">    Raises:</span>
+<a id="__codelineno-0-347" name="__codelineno-0-347"></a><span class="sd">        FileNotFoundError: when a path does not exist.</span>
+<a id="__codelineno-0-348" name="__codelineno-0-348"></a><span class="sd">        ValueError: when a path's suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is</span>
+<a id="__codelineno-0-349" name="__codelineno-0-349"></a><span class="sd">            malformed; when ``resolution`` is not positive; when ``level`` is negative; or when ``resolution``</span>
+<a id="__codelineno-0-350" name="__codelineno-0-350"></a><span class="sd">            and ``level`` are both given.</span>
+<a id="__codelineno-0-351" name="__codelineno-0-351"></a><span class="sd">        KeyError: when a requested dimension is not one this package reads.</span>
+<a id="__codelineno-0-352" name="__codelineno-0-352"></a>
+<a id="__codelineno-0-353" name="__codelineno-0-353"></a><span class="sd">    Examples:</span>
+<a id="__codelineno-0-354" name="__codelineno-0-354"></a><span class="sd">        A bounding box reads a corner of the cloud, fetching only the chunks that reach into it:</span>
+<a id="__codelineno-0-355" name="__codelineno-0-355"></a>
+<a id="__codelineno-0-356" name="__codelineno-0-356"></a><span class="sd">        &gt;&gt;&gt; arrays = read_window(  # doctest: +SKIP</span>
+<a id="__codelineno-0-357" name="__codelineno-0-357"></a><span class="sd">        ...     "examples/data/sample.copc.laz", bbox=(155000, 463000, 155020, 463020)</span>
+<a id="__codelineno-0-358" name="__codelineno-0-358"></a><span class="sd">        ... )</span>
+<a id="__codelineno-0-359" name="__codelineno-0-359"></a><span class="sd">        &gt;&gt;&gt; arrays["x"].size  # 121 of the file's 1600 points  # doctest: +SKIP</span>
+<a id="__codelineno-0-360" name="__codelineno-0-360"></a><span class="sd">        121</span>
 <a id="__codelineno-0-361" name="__codelineno-0-361"></a>
-<a id="__codelineno-0-362" name="__codelineno-0-362"></a><span class="sd">        &gt;&gt;&gt; coarse = read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP</span>
-<a id="__codelineno-0-363" name="__codelineno-0-363"></a><span class="sd">        &gt;&gt;&gt; coarse["x"].size, coarse["classification"].size  # doctest: +SKIP</span>
-<a id="__codelineno-0-364" name="__codelineno-0-364"></a><span class="sd">        (100, 100)</span>
-<a id="__codelineno-0-365" name="__codelineno-0-365"></a>
-<a id="__codelineno-0-366" name="__codelineno-0-366"></a><span class="sd">        The two compose, and a dimension list trims what is decompressed per point:</span>
+<a id="__codelineno-0-362" name="__codelineno-0-362"></a><span class="sd">        A resolution reads the whole extent sparsely instead, which is what a zoomed-out view wants:</span>
+<a id="__codelineno-0-363" name="__codelineno-0-363"></a>
+<a id="__codelineno-0-364" name="__codelineno-0-364"></a><span class="sd">        &gt;&gt;&gt; coarse = read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP</span>
+<a id="__codelineno-0-365" name="__codelineno-0-365"></a><span class="sd">        &gt;&gt;&gt; coarse["x"].size, coarse["classification"].size  # doctest: +SKIP</span>
+<a id="__codelineno-0-366" name="__codelineno-0-366"></a><span class="sd">        (100, 100)</span>
 <a id="__codelineno-0-367" name="__codelineno-0-367"></a>
-<a id="__codelineno-0-368" name="__codelineno-0-368"></a><span class="sd">        &gt;&gt;&gt; corner = read_window(  # doctest: +SKIP</span>
-<a id="__codelineno-0-369" name="__codelineno-0-369"></a><span class="sd">        ...     "examples/data/sample.copc.laz",</span>
-<a id="__codelineno-0-370" name="__codelineno-0-370"></a><span class="sd">        ...     bbox=(155000, 463000, 155020, 463020),</span>
-<a id="__codelineno-0-371" name="__codelineno-0-371"></a><span class="sd">        ...     resolution=7.8,</span>
-<a id="__codelineno-0-372" name="__codelineno-0-372"></a><span class="sd">        ...     dimensions=("X", "Y"),</span>
-<a id="__codelineno-0-373" name="__codelineno-0-373"></a><span class="sd">        ... )</span>
-<a id="__codelineno-0-374" name="__codelineno-0-374"></a><span class="sd">        &gt;&gt;&gt; sorted(corner)  # doctest: +SKIP</span>
-<a id="__codelineno-0-375" name="__codelineno-0-375"></a><span class="sd">        ['x', 'y']</span>
-<a id="__codelineno-0-376" name="__codelineno-0-376"></a><span class="sd">    """</span>
-<a id="__codelineno-0-377" name="__codelineno-0-377"></a>    <span class="k">if</span> <span class="n">resolution</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-378" name="__codelineno-0-378"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"pass either resolution= or level=, not both; they are two ways to say the same thing"</span><span class="p">)</span>
-<a id="__codelineno-0-379" name="__codelineno-0-379"></a>    <span class="k">if</span> <span class="n">resolution</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">resolution</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
-<a id="__codelineno-0-380" name="__codelineno-0-380"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"resolution must be positive; got </span><span class="si">{</span><span class="n">resolution</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-<a id="__codelineno-0-381" name="__codelineno-0-381"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">level</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
-<a id="__codelineno-0-382" name="__codelineno-0-382"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"level must be a non-negative octree level; got </span><span class="si">{</span><span class="n">level</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
-<a id="__codelineno-0-383" name="__codelineno-0-383"></a>
-<a id="__codelineno-0-384" name="__codelineno-0-384"></a>    <span class="n">requested</span> <span class="o">=</span> <span class="n">_records</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="n">dimensions</span><span class="p">)</span>
-<a id="__codelineno-0-385" name="__codelineno-0-385"></a>    <span class="c1"># An exact bbox clip needs x and y even when the caller did not ask for them; read them, then drop them</span>
-<a id="__codelineno-0-386" name="__codelineno-0-386"></a>    <span class="c1"># again if they were not requested.</span>
-<a id="__codelineno-0-387" name="__codelineno-0-387"></a>    <span class="n">needed</span> <span class="o">=</span> <span class="n">requested</span> <span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">((</span><span class="s2">"x"</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">,</span> <span class="o">*</span><span class="n">requested</span><span class="p">)))</span>
-<a id="__codelineno-0-388" name="__codelineno-0-388"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
-<a id="__codelineno-0-389" name="__codelineno-0-389"></a>        <span class="n">bounds</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_as_bounds</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">header</span><span class="p">)</span>
-<a id="__codelineno-0-390" name="__codelineno-0-390"></a>        <span class="n">points</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">)</span>
-<a id="__codelineno-0-391" name="__codelineno-0-391"></a>        <span class="n">arrays</span> <span class="o">=</span> <span class="n">_records</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">needed</span><span class="p">)</span>
-<a id="__codelineno-0-392" name="__codelineno-0-392"></a>        <span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-0-393" name="__codelineno-0-393"></a>            <span class="n">arrays</span> <span class="o">=</span> <span class="n">_clip_to_box</span><span class="p">(</span><span class="n">arrays</span><span class="p">,</span> <span class="n">bbox</span><span class="p">)</span>
-<a id="__codelineno-0-394" name="__codelineno-0-394"></a>            <span class="n">arrays</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">arrays</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">requested</span><span class="p">}</span>
-<a id="__codelineno-0-395" name="__codelineno-0-395"></a>        <span class="k">return</span> <span class="n">arrays</span>
+<a id="__codelineno-0-368" name="__codelineno-0-368"></a><span class="sd">        The two compose, and a dimension list selects which arrays come back:</span>
+<a id="__codelineno-0-369" name="__codelineno-0-369"></a>
+<a id="__codelineno-0-370" name="__codelineno-0-370"></a><span class="sd">        &gt;&gt;&gt; corner = read_window(  # doctest: +SKIP</span>
+<a id="__codelineno-0-371" name="__codelineno-0-371"></a><span class="sd">        ...     "examples/data/sample.copc.laz",</span>
+<a id="__codelineno-0-372" name="__codelineno-0-372"></a><span class="sd">        ...     bbox=(155000, 463000, 155020, 463020),</span>
+<a id="__codelineno-0-373" name="__codelineno-0-373"></a><span class="sd">        ...     resolution=7.8,</span>
+<a id="__codelineno-0-374" name="__codelineno-0-374"></a><span class="sd">        ...     dimensions=("X", "Y"),</span>
+<a id="__codelineno-0-375" name="__codelineno-0-375"></a><span class="sd">        ... )</span>
+<a id="__codelineno-0-376" name="__codelineno-0-376"></a><span class="sd">        &gt;&gt;&gt; sorted(corner)  # doctest: +SKIP</span>
+<a id="__codelineno-0-377" name="__codelineno-0-377"></a><span class="sd">        ['x', 'y']</span>
+<a id="__codelineno-0-378" name="__codelineno-0-378"></a><span class="sd">    """</span>
+<a id="__codelineno-0-379" name="__codelineno-0-379"></a>    <span class="k">if</span> <span class="n">resolution</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">level</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-380" name="__codelineno-0-380"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"pass either resolution= or level=, not both; they are two ways to say the same thing"</span><span class="p">)</span>
+<a id="__codelineno-0-381" name="__codelineno-0-381"></a>    <span class="k">if</span> <span class="n">resolution</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">resolution</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-0-382" name="__codelineno-0-382"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"resolution must be positive; got </span><span class="si">{</span><span class="n">resolution</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-0-383" name="__codelineno-0-383"></a>    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">level</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">level</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+<a id="__codelineno-0-384" name="__codelineno-0-384"></a>        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"level must be a non-negative octree level; got </span><span class="si">{</span><span class="n">level</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+<a id="__codelineno-0-385" name="__codelineno-0-385"></a>
+<a id="__codelineno-0-386" name="__codelineno-0-386"></a>    <span class="n">requested</span> <span class="o">=</span> <span class="n">_records</span><span class="o">.</span><span class="n">resolve</span><span class="p">(</span><span class="n">dimensions</span><span class="p">)</span>
+<a id="__codelineno-0-387" name="__codelineno-0-387"></a>    <span class="c1"># An exact bbox clip needs x and y even when the caller did not ask for them; read them, then drop them</span>
+<a id="__codelineno-0-388" name="__codelineno-0-388"></a>    <span class="c1"># again if they were not requested.</span>
+<a id="__codelineno-0-389" name="__codelineno-0-389"></a>    <span class="n">needed</span> <span class="o">=</span> <span class="n">requested</span> <span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="nb">tuple</span><span class="p">(</span><span class="nb">dict</span><span class="o">.</span><span class="n">fromkeys</span><span class="p">((</span><span class="s2">"x"</span><span class="p">,</span> <span class="s2">"y"</span><span class="p">,</span> <span class="o">*</span><span class="n">requested</span><span class="p">)))</span>
+<a id="__codelineno-0-390" name="__codelineno-0-390"></a>    <span class="k">with</span> <span class="n">_reader</span><span class="p">(</span><span class="n">source</span><span class="p">)</span> <span class="k">as</span> <span class="n">reader</span><span class="p">:</span>
+<a id="__codelineno-0-391" name="__codelineno-0-391"></a>        <span class="n">bounds</span> <span class="o">=</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">_as_bounds</span><span class="p">(</span><span class="n">bbox</span><span class="p">,</span> <span class="n">reader</span><span class="o">.</span><span class="n">header</span><span class="p">)</span>
+<a id="__codelineno-0-392" name="__codelineno-0-392"></a>        <span class="n">points</span> <span class="o">=</span> <span class="n">reader</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="n">resolution</span><span class="p">,</span> <span class="n">level</span><span class="o">=</span><span class="n">level</span><span class="p">)</span>
+<a id="__codelineno-0-393" name="__codelineno-0-393"></a>        <span class="n">arrays</span> <span class="o">=</span> <span class="n">_records</span><span class="o">.</span><span class="n">extract</span><span class="p">(</span><span class="n">points</span><span class="p">,</span> <span class="n">needed</span><span class="p">)</span>
+<a id="__codelineno-0-394" name="__codelineno-0-394"></a>        <span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-395" name="__codelineno-0-395"></a>            <span class="n">arrays</span> <span class="o">=</span> <span class="n">_clip_to_box</span><span class="p">(</span><span class="n">arrays</span><span class="p">,</span> <span class="n">bbox</span><span class="p">)</span>
+<a id="__codelineno-0-396" name="__codelineno-0-396"></a>            <span class="n">arrays</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">arrays</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">requested</span><span class="p">}</span>
+<a id="__codelineno-0-397" name="__codelineno-0-397"></a>        <span class="k">return</span> <span class="n">arrays</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
