@@ -282,6 +282,68 @@ class TestToCrs:
         with pytest.raises(ValueError, match="vertical"):
             cloud.to_crs("EPSG:32631", vertical=True)
 
+    def test_vertical_shift_never_silently_passes_z_through(self):
+        """A real datum shift either moves z or raises - it must never return z unchanged (H1).
+
+        EPSG:4979 (ellipsoidal height) -> EPSG:7415 (RD New + NAP orthometric height) needs a geoid grid. When the
+        grid is present z changes by the geoid separation; when it is absent the transform is refused. The one
+        outcome ruled out is z passing through untouched, which the old best-effort transform did silently.
+        """
+        import pyproj
+
+        cloud = PointCloud(x=np.array([5.387]), y=np.array([52.155]), z=np.array([0.0]), crs="EPSG:4979")
+
+        try:
+            out = cloud.to_crs("EPSG:7415", vertical=True)
+        except pyproj.exceptions.ProjError:
+            return
+        assert out.z[0] != 0.0, "a vertical-datum shift must change z, never silently leave it in the source datum"
+
+    def test_out_of_domain_points_raise(self):
+        """A point outside the transform's domain raises rather than coming back as a silent `inf` (M1)."""
+        import pyproj
+
+        cloud = PointCloud(x=np.array([200.0]), y=np.array([95.0]), z=np.zeros(1), crs="EPSG:4326")
+
+        with pytest.raises(pyproj.exceptions.ProjError):
+            cloud.to_crs("EPSG:32601")
+
+    def test_result_does_not_alias_the_source_arrays(self):
+        """The returned cloud owns independent z and attribute arrays; editing it never touches the source (M2)."""
+        cloud = PointCloud(
+            x=np.array([155000.0, 155038.0]),
+            y=np.array([463000.0, 463038.0]),
+            z=np.array([1.0, 2.0]),
+            classification=np.array([2, 5], dtype=np.uint8),
+            crs="EPSG:28992",
+        )
+
+        out = cloud.to_crs("EPSG:32631")
+        out.z[0] = -999.0
+        out.classification[0] = 99
+
+        assert cloud.z[0] == 1.0, "mutating the result's z must not reach back into the source"
+        assert cloud.classification[0] == 2, "mutating the result's attributes must not reach the source"
+        assert not np.shares_memory(out.z, cloud.z), "z must be an independent array"
+        assert not np.shares_memory(out.classification, cloud.classification), "attributes must be independent"
+
+    def test_reprojects_an_empty_cloud(self):
+        """A zero-point cloud reprojects to a zero-point cloud in the target CRS, with nothing to transform."""
+        cloud = PointCloud(x=np.empty(0), y=np.empty(0), z=np.empty(0), crs="EPSG:28992")
+
+        out = cloud.to_crs("EPSG:32631")
+
+        assert len(out) == 0, "an empty cloud stays empty"
+        assert out.crs.to_epsg() == 32631, "the target CRS is still set on an empty cloud"
+
+    def test_accepts_an_int_epsg_code(self):
+        """The target may be given as an int EPSG code, matching what `pyproj.CRS.from_user_input` accepts (N1)."""
+        cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1), crs="EPSG:28992")
+
+        out = cloud.to_crs(32631)
+
+        assert out.crs.to_epsg() == 32631, "an int EPSG code must be accepted and normalised"
+
     def test_it_loads_a_lazy_cloud(self, sample_laz):
         """to_crs is a record operation, so it loads a lazy cloud before transforming."""
         cloud = PointCloud.read_file(sample_laz)

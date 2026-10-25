@@ -253,7 +253,7 @@ class PointCloud:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
         return np.column_stack(cols)
 
-    def to_crs(self, crs: CRS | str, *, vertical: bool = False) -> PointCloud:
+    def to_crs(self, crs: CRS | str | int, *, vertical: bool = False) -> PointCloud:
         """Reproject the cloud into another CRS with pyproj, returning a new cloud.
 
         The transform is built with ``Transformer.from_crs(..., always_xy=True)``, so coordinates are always
@@ -265,14 +265,23 @@ class PointCloud:
         unchanged, still in the source vertical datum. This is the right choice when the target is a 2-D
         horizontal CRS - there is no vertical transformation to apply - but it means a 3-D reprojection is never
         done implicitly. To shift z as well, pass ``vertical=True``; this requires a compound or 3-D CRS on both
-        sides (one that carries a vertical axis) and raises otherwise, so z is never silently left in the source
-        datum when a vertical transform was asked for but is impossible.
+        sides (one that carries a vertical axis) and raises ``ValueError`` otherwise. The transform is then built
+        with ``only_best=True`` and run with ``errcheck=True``, so if the required vertical operation (e.g. a
+        geoid grid) is unavailable pyproj raises rather than falling back to an operation that passes z through -
+        z is never silently left in the source datum when a vertical transform was asked for but is impossible.
 
-        Attribute arrays (intensity, classification, return number) are carried over unchanged and stay aligned
-        with the reprojected coordinates.
+        Out-of-domain points are an error, not a silent ``inf``: the transform runs with ``errcheck=True``, so a
+        coordinate outside the transform's area of use raises instead of poisoning the result with non-finite
+        values.
+
+        Attribute arrays (intensity, classification, return number) are carried over by value - the returned
+        cloud owns independent copies, so editing it never reaches back into the source - and stay aligned with
+        the reprojected coordinates. The whole cloud is materialised: a lazy source is loaded first, and the cost
+        is O(N) in points, with no chunked/streaming path.
 
         Args:
-            crs: the target CRS, as anything :class:`pyproj.CRS` accepts (an EPSG string, WKT, a ``CRS``).
+            crs: the target CRS, as anything :class:`pyproj.CRS` accepts (an int or string EPSG code, WKT, a
+                ``CRS``).
             vertical: when ``True``, transform z as well as x/y; requires a vertical/compound CRS on both sides.
 
         Returns:
@@ -281,6 +290,8 @@ class PointCloud:
         Raises:
             ValueError: when :attr:`crs` is ``None`` (no source CRS to transform from), or when ``vertical`` is
                 ``True`` but the source or target CRS carries no vertical axis.
+            pyproj.exceptions.ProjError: when a point falls outside the transform's domain, or when ``vertical``
+                is ``True`` and the required vertical-datum operation (e.g. a geoid grid) is unavailable.
 
         Examples:
             - Reproject a Dutch RD New cloud into UTM zone 31N; the result reports the target CRS:
@@ -324,19 +335,19 @@ class PointCloud:
                 f"got source {self._crs.to_string()!r} and target {target.to_string()!r}. Refusing rather "
                 "than leaving z in the source datum."
             )
-        transformer = Transformer.from_crs(self._crs, target, always_xy=True)
+        transformer = Transformer.from_crs(self._crs, target, always_xy=True, only_best=vertical)
         if vertical:
-            x, y, z = transformer.transform(self.x, self.y, self.z)
+            x, y, z = transformer.transform(self.x, self.y, self.z, errcheck=True)
         else:
-            x, y = transformer.transform(self.x, self.y)
-            z = self.z
+            x, y = transformer.transform(self.x, self.y, errcheck=True)
+            z = self.z.copy()
         return PointCloud(
             x=x,
             y=y,
             z=z,
-            intensity=self.intensity,
-            classification=self.classification,
-            return_number=self.return_number,
+            intensity=self.intensity.copy(),
+            classification=self.classification.copy(),
+            return_number=self.return_number.copy(),
             crs=target,
         )
 
