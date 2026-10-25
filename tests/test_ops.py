@@ -378,6 +378,15 @@ class TestToGrid:
         with pytest.raises(ValueError, match="percentile out of range"):
             grid_cloud.to_grid(cell_size=1.0, aggregate="p150", bounds=self.BOUNDS)
 
+    def test_points_on_the_max_edge_land_in_the_last_cell(self):
+        """A point exactly on xmax / ymin is kept in the last cell, not dropped (default-bounds data loss)."""
+        cloud = PointCloud(x=np.array([0.0, 2.0]), y=np.array([2.0, 0.0]), z=np.array([10.0, 20.0]))
+
+        array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="count")
+
+        assert array.sum() == 2.0
+        assert array[0, 0] == 1.0 and array[1, 1] == 1.0
+
     def test_percentile_of_an_empty_grid_is_all_nodata(self):
         """A percentile grid with no points in the extent is entirely nodata, not an error."""
         cloud = PointCloud(x=np.array([9.0]), y=np.array([9.0]), z=np.array([1.0]))

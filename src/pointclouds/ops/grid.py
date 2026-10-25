@@ -99,7 +99,7 @@ def to_grid(
 
     x, y, z = cloud.x, cloud.y, cloud.z
     if mode == "bin":
-        cell, values, distance = _bin_contributions(x, y, z, xmin, ymax, cell_size, ncols, nrows)
+        cell, values, distance = _bin_contributions(x, y, z, xmin, xmax, ymin, ymax, cell_size, ncols, nrows)
     else:
         cell, values, distance = _radius_contributions(
             x, y, z, xmin, ymax, cell_size, ncols, nrows, radius if radius is not None else cell_size * math.sqrt(2)
@@ -110,20 +110,25 @@ def to_grid(
     return flat.reshape(nrows, ncols), transform, cloud.crs
 
 
-def _bin_contributions(x, y, z, xmin, ymax, cell_size, ncols, nrows):
+def _bin_contributions(x, y, z, xmin, xmax, ymin, ymax, cell_size, ncols, nrows):
     """Assign each point to the one cell it falls in, dropping points outside the grid.
+
+    Membership is the closed box ``[xmin, xmax] x [ymin, ymax]``, and the cell index is then clamped into the
+    grid, so a point exactly on the max-x or min-y edge folds into the last column/row (the closed-last-edge rule
+    ``np.histogram2d`` uses) instead of being discarded. That matters on the default call path, where ``bounds``
+    is the cloud's own extent and ``xmax``/``ymin`` are by construction real points.
 
     Returns the flat cell index, the z-value and the distance to that cell's centre, one entry per kept point.
     """
-    col = np.floor((x - xmin) / cell_size).astype(np.int64)
-    row = np.floor((ymax - y) / cell_size).astype(np.int64)
-    inside = (col >= 0) & (col < ncols) & (row >= 0) & (row < nrows)
-    col, row = col[inside], row[inside]
+    inside = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+    xi, yi, zi = x[inside], y[inside], z[inside]
+    col = np.clip(np.floor((xi - xmin) / cell_size).astype(np.int64), 0, ncols - 1)
+    row = np.clip(np.floor((ymax - yi) / cell_size).astype(np.int64), 0, nrows - 1)
 
     centre_x = xmin + (col + 0.5) * cell_size
     centre_y = ymax - (row + 0.5) * cell_size
-    distance = np.hypot(x[inside] - centre_x, y[inside] - centre_y)
-    return row * ncols + col, z[inside], distance
+    distance = np.hypot(xi - centre_x, yi - centre_y)
+    return row * ncols + col, zi, distance
 
 
 def _radius_contributions(x, y, z, xmin, ymax, cell_size, ncols, nrows, radius):
