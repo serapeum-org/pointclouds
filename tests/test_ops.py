@@ -192,6 +192,13 @@ class TestClip:
 
         assert kept.x.tolist() == [2.0] and kept.y.tolist() == [2.0]
 
+    def test_a_self_closing_polygon_ring_is_accepted(self):
+        """A ring whose first vertex is repeated as the last is treated the same as an open ring."""
+        ring = np.array([[1.0, 1.0], [1.0, 3.0], [3.0, 3.0], [3.0, 1.0], [1.0, 1.0]])
+        cloud = PointCloud(x=np.array([2.0, 0.0]), y=np.array([2.0, 0.0]), z=np.zeros(2))
+
+        assert cloud.clip(polygon=ring).x.tolist() == [2.0]
+
     def test_a_concave_polygon_is_handled(self):
         """Ray casting is exact for a concave ring, not just a convex one."""
         arrow = np.array([[0.0, 0.0], [4.0, 2.0], [0.0, 4.0], [1.0, 2.0]])
@@ -352,6 +359,22 @@ class TestToGrid:
         array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="count", bounds=(0.0, 0.0, 2.0, 2.0))
 
         assert array.sum() == 1.0
+
+    def test_radius_mode_mean_averages_every_point_within_radius(self):
+        """Radius mode works with a non-count aggregate: both points near the centre average together."""
+        cloud = PointCloud(x=np.array([0.5, 0.9]), y=np.array([0.5, 0.9]), z=np.array([10.0, 20.0]))
+
+        array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="mean", mode="radius", bounds=(0.0, 0.0, 1.0, 1.0))
+
+        assert array[0, 0] == pytest.approx(15.0)
+
+    def test_a_nan_z_propagates_through_mean(self):
+        """A NaN z-value is not filtered; it propagates into its cell's mean (characterization)."""
+        cloud = PointCloud(x=np.array([0.5, 0.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, np.nan]))
+
+        array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="mean", bounds=(0.0, 0.0, 1.0, 1.0))
+
+        assert np.isnan(array[0, 0])
 
     def test_radius_window_spreads_a_point_to_nearby_cells(self):
         """In radius mode the same point reaches every cell whose centre is within sqrt(2)."""
