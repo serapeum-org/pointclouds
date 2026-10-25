@@ -2343,7 +2343,8 @@ dependency set only (numpy / laspy / pyproj / scipy) and never GDAL.</p>
 <span class="normal"><a href="#__codelineno-0-460">460</a></span>
 <span class="normal"><a href="#__codelineno-0-461">461</a></span>
 <span class="normal"><a href="#__codelineno-0-462">462</a></span>
-<span class="normal"><a href="#__codelineno-0-463">463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-463">463</a></span>
+<span class="normal"><a href="#__codelineno-0-464">464</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
 <a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="w">    </span><span class="sd">"""In-memory point cloud: parallel per-dimension arrays plus a CRS.</span>
 <a id="__codelineno-0-43" name="__codelineno-0-43"></a>
 <a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">    The constructor builds an eager cloud from arrays already in hand. To read a file, use</span>
@@ -2722,50 +2723,51 @@ dependency set only (numpy / laspy / pyproj / scipy) and never GDAL.</p>
 <a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">            affine 6-tuple ``(xmin, cell_size, 0, ymax, 0, -cell_size)``, and the cloud's CRS.</span>
 <a id="__codelineno-0-418" name="__codelineno-0-418"></a>
 <a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">        Raises:</span>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">            ValueError: on a non-positive ``cell_size``, a non-positive-area ``bounds``, an unknown ``mode``, or an</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">                unrecognised ``aggregate``.</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">        Examples:</span>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">            &gt;&gt;&gt; import numpy as np</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">            &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">            &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">            &gt;&gt;&gt; array.tolist()</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">            [[10.0, 20.0]]</span>
-<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        """</span>
-<a id="__codelineno-0-430" name="__codelineno-0-430"></a>        <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
-<a id="__codelineno-0-431" name="__codelineno-0-431"></a>            <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
-<a id="__codelineno-0-432" name="__codelineno-0-432"></a>        <span class="p">)</span>
-<a id="__codelineno-0-433" name="__codelineno-0-433"></a>
-<a id="__codelineno-0-434" name="__codelineno-0-434"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PointCloud</span><span class="p">:</span>
-<a id="__codelineno-0-435" name="__codelineno-0-435"></a><span class="w">        </span><span class="sd">"""Return a new cloud holding the selected points, every coordinate and attribute subset in step.</span>
-<a id="__codelineno-0-436" name="__codelineno-0-436"></a>
-<a id="__codelineno-0-437" name="__codelineno-0-437"></a><span class="sd">        Args:</span>
-<a id="__codelineno-0-438" name="__codelineno-0-438"></a><span class="sd">            selector: a boolean mask of length ``len(self)``, or an integer index array into the points.</span>
-<a id="__codelineno-0-439" name="__codelineno-0-439"></a>
-<a id="__codelineno-0-440" name="__codelineno-0-440"></a><span class="sd">        Returns:</span>
-<a id="__codelineno-0-441" name="__codelineno-0-441"></a><span class="sd">            A new, eager cloud. An attribute the cloud does not carry (an empty array) stays empty rather than</span>
-<a id="__codelineno-0-442" name="__codelineno-0-442"></a><span class="sd">            being indexed, so the empty-means-absent convention is preserved.</span>
-<a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">        """</span>
-<a id="__codelineno-0-444" name="__codelineno-0-444"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
-<a id="__codelineno-0-445" name="__codelineno-0-445"></a>        <span class="n">attributes</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-446" name="__codelineno-0-446"></a>            <span class="n">name</span><span class="p">:</span> <span class="n">values</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="n">values</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-<a id="__codelineno-0-447" name="__codelineno-0-447"></a>        <span class="p">}</span>
-<a id="__codelineno-0-448" name="__codelineno-0-448"></a>        <span class="k">return</span> <span class="n">PointCloud</span><span class="p">(</span>
-<a id="__codelineno-0-449" name="__codelineno-0-449"></a>            <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">z</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">crs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="p">,</span> <span class="o">**</span><span class="n">attributes</span>
-<a id="__codelineno-0-450" name="__codelineno-0-450"></a>        <span class="p">)</span>
-<a id="__codelineno-0-451" name="__codelineno-0-451"></a>
-<a id="__codelineno-0-452" name="__codelineno-0-452"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-454" name="__codelineno-0-454"></a>
-<a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">        """</span>
-<a id="__codelineno-0-457" name="__codelineno-0-457"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-<a id="__codelineno-0-458" name="__codelineno-0-458"></a>
-<a id="__codelineno-0-459" name="__codelineno-0-459"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-461" name="__codelineno-0-461"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-462" name="__codelineno-0-462"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-463" name="__codelineno-0-463"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">            ValueError: on a non-positive ``cell_size``; a non-positive-area extent (a degenerate ``bounds``, or</span>
+<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">                the default extent of a flat cloud whose points share a single x or a single y); an unknown</span>
+<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">                ``mode``; or an unrecognised ``aggregate``.</span>
+<a id="__codelineno-0-423" name="__codelineno-0-423"></a>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        Examples:</span>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">            &gt;&gt;&gt; import numpy as np</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">            &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">            &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">            &gt;&gt;&gt; array.tolist()</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">            [[10.0, 20.0]]</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">        """</span>
+<a id="__codelineno-0-431" name="__codelineno-0-431"></a>        <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
+<a id="__codelineno-0-432" name="__codelineno-0-432"></a>            <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
+<a id="__codelineno-0-433" name="__codelineno-0-433"></a>        <span class="p">)</span>
+<a id="__codelineno-0-434" name="__codelineno-0-434"></a>
+<a id="__codelineno-0-435" name="__codelineno-0-435"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PointCloud</span><span class="p">:</span>
+<a id="__codelineno-0-436" name="__codelineno-0-436"></a><span class="w">        </span><span class="sd">"""Return a new cloud holding the selected points, every coordinate and attribute subset in step.</span>
+<a id="__codelineno-0-437" name="__codelineno-0-437"></a>
+<a id="__codelineno-0-438" name="__codelineno-0-438"></a><span class="sd">        Args:</span>
+<a id="__codelineno-0-439" name="__codelineno-0-439"></a><span class="sd">            selector: a boolean mask of length ``len(self)``, or an integer index array into the points.</span>
+<a id="__codelineno-0-440" name="__codelineno-0-440"></a>
+<a id="__codelineno-0-441" name="__codelineno-0-441"></a><span class="sd">        Returns:</span>
+<a id="__codelineno-0-442" name="__codelineno-0-442"></a><span class="sd">            A new, eager cloud. An attribute the cloud does not carry (an empty array) stays empty rather than</span>
+<a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">            being indexed, so the empty-means-absent convention is preserved.</span>
+<a id="__codelineno-0-444" name="__codelineno-0-444"></a><span class="sd">        """</span>
+<a id="__codelineno-0-445" name="__codelineno-0-445"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<a id="__codelineno-0-446" name="__codelineno-0-446"></a>        <span class="n">attributes</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-447" name="__codelineno-0-447"></a>            <span class="n">name</span><span class="p">:</span> <span class="n">values</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="n">values</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<a id="__codelineno-0-448" name="__codelineno-0-448"></a>        <span class="p">}</span>
+<a id="__codelineno-0-449" name="__codelineno-0-449"></a>        <span class="k">return</span> <span class="n">PointCloud</span><span class="p">(</span>
+<a id="__codelineno-0-450" name="__codelineno-0-450"></a>            <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">z</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">crs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="p">,</span> <span class="o">**</span><span class="n">attributes</span>
+<a id="__codelineno-0-451" name="__codelineno-0-451"></a>        <span class="p">)</span>
+<a id="__codelineno-0-452" name="__codelineno-0-452"></a>
+<a id="__codelineno-0-453" name="__codelineno-0-453"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-455" name="__codelineno-0-455"></a>
+<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-457" name="__codelineno-0-457"></a><span class="sd">        """</span>
+<a id="__codelineno-0-458" name="__codelineno-0-458"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<a id="__codelineno-0-459" name="__codelineno-0-459"></a>
+<a id="__codelineno-0-460" name="__codelineno-0-460"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-462" name="__codelineno-0-462"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-463" name="__codelineno-0-463"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-464" name="__codelineno-0-464"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -3341,17 +3343,17 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-452">452</a></span>
-<span class="normal"><a href="#__codelineno-0-453">453</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-453">453</a></span>
 <span class="normal"><a href="#__codelineno-0-454">454</a></span>
 <span class="normal"><a href="#__codelineno-0-455">455</a></span>
 <span class="normal"><a href="#__codelineno-0-456">456</a></span>
-<span class="normal"><a href="#__codelineno-0-457">457</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-452" name="__codelineno-0-452"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-454" name="__codelineno-0-454"></a>
-<a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">    """</span>
-<a id="__codelineno-0-457" name="__codelineno-0-457"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="normal"><a href="#__codelineno-0-457">457</a></span>
+<span class="normal"><a href="#__codelineno-0-458">458</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-455" name="__codelineno-0-455"></a>
+<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-457" name="__codelineno-0-457"></a><span class="sd">    """</span>
+<a id="__codelineno-0-458" name="__codelineno-0-458"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -3374,15 +3376,15 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-459">459</a></span>
-<span class="normal"><a href="#__codelineno-0-460">460</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-460">460</a></span>
 <span class="normal"><a href="#__codelineno-0-461">461</a></span>
 <span class="normal"><a href="#__codelineno-0-462">462</a></span>
-<span class="normal"><a href="#__codelineno-0-463">463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-461" name="__codelineno-0-461"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-462" name="__codelineno-0-462"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-463" name="__codelineno-0-463"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+<span class="normal"><a href="#__codelineno-0-463">463</a></span>
+<span class="normal"><a href="#__codelineno-0-464">464</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-462" name="__codelineno-0-462"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-463" name="__codelineno-0-463"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-464" name="__codelineno-0-464"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -4830,8 +4832,9 @@ points inside the pixel contribute); see :mod:<code>pointclouds.ops.grid</code> 
             </td>
             <td>
               <div class="doc-md-description">
-                <p>on a non-positive <code>cell_size</code>, a non-positive-area <code>bounds</code>, an unknown <code>mode</code>, or an
-unrecognised <code>aggregate</code>.</p>
+                <p>on a non-positive <code>cell_size</code>; a non-positive-area extent (a degenerate <code>bounds</code>, or
+the default extent of a flat cloud whose points share a single x or a single y); an unknown
+<code>mode</code>; or an unrecognised <code>aggregate</code>.</p>
               </div>
             </td>
           </tr>
@@ -4890,7 +4893,8 @@ unrecognised <code>aggregate</code>.</p>
 <span class="normal"><a href="#__codelineno-0-429">429</a></span>
 <span class="normal"><a href="#__codelineno-0-430">430</a></span>
 <span class="normal"><a href="#__codelineno-0-431">431</a></span>
-<span class="normal"><a href="#__codelineno-0-432">432</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_grid</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-432">432</a></span>
+<span class="normal"><a href="#__codelineno-0-433">433</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_grid</span><span class="p">(</span>
 <a id="__codelineno-0-393" name="__codelineno-0-393"></a>    <span class="bp">self</span><span class="p">,</span>
 <a id="__codelineno-0-394" name="__codelineno-0-394"></a>    <span class="o">*</span><span class="p">,</span>
 <a id="__codelineno-0-395" name="__codelineno-0-395"></a>    <span class="n">cell_size</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
@@ -4918,19 +4922,20 @@ unrecognised <code>aggregate</code>.</p>
 <a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">        affine 6-tuple ``(xmin, cell_size, 0, ymax, 0, -cell_size)``, and the cloud's CRS.</span>
 <a id="__codelineno-0-418" name="__codelineno-0-418"></a>
 <a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        ValueError: on a non-positive ``cell_size``, a non-positive-area ``bounds``, an unknown ``mode``, or an</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">            unrecognised ``aggregate``.</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">    Examples:</span>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        &gt;&gt;&gt; import numpy as np</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">        &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        &gt;&gt;&gt; array.tolist()</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">        [[10.0, 20.0]]</span>
-<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">    """</span>
-<a id="__codelineno-0-430" name="__codelineno-0-430"></a>    <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
-<a id="__codelineno-0-431" name="__codelineno-0-431"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
-<a id="__codelineno-0-432" name="__codelineno-0-432"></a>    <span class="p">)</span>
+<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        ValueError: on a non-positive ``cell_size``; a non-positive-area extent (a degenerate ``bounds``, or</span>
+<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">            the default extent of a flat cloud whose points share a single x or a single y); an unknown</span>
+<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">            ``mode``; or an unrecognised ``aggregate``.</span>
+<a id="__codelineno-0-423" name="__codelineno-0-423"></a>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">    Examples:</span>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">        &gt;&gt;&gt; import numpy as np</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">        &gt;&gt;&gt; array.tolist()</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        [[10.0, 20.0]]</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">    """</span>
+<a id="__codelineno-0-431" name="__codelineno-0-431"></a>    <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
+<a id="__codelineno-0-432" name="__codelineno-0-432"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
+<a id="__codelineno-0-433" name="__codelineno-0-433"></a>    <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -5578,7 +5583,8 @@ via :meth:<code>PointCloud.load</code>. The distinction that matters, and the re
 <span class="normal"><a href="#__codelineno-0-460">460</a></span>
 <span class="normal"><a href="#__codelineno-0-461">461</a></span>
 <span class="normal"><a href="#__codelineno-0-462">462</a></span>
-<span class="normal"><a href="#__codelineno-0-463">463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
+<span class="normal"><a href="#__codelineno-0-463">463</a></span>
+<span class="normal"><a href="#__codelineno-0-464">464</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-41" name="__codelineno-0-41"></a><span class="k">class</span><span class="w"> </span><span class="nc">PointCloud</span><span class="p">:</span>
 <a id="__codelineno-0-42" name="__codelineno-0-42"></a><span class="w">    </span><span class="sd">"""In-memory point cloud: parallel per-dimension arrays plus a CRS.</span>
 <a id="__codelineno-0-43" name="__codelineno-0-43"></a>
 <a id="__codelineno-0-44" name="__codelineno-0-44"></a><span class="sd">    The constructor builds an eager cloud from arrays already in hand. To read a file, use</span>
@@ -5957,50 +5963,51 @@ via :meth:<code>PointCloud.load</code>. The distinction that matters, and the re
 <a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">            affine 6-tuple ``(xmin, cell_size, 0, ymax, 0, -cell_size)``, and the cloud's CRS.</span>
 <a id="__codelineno-0-418" name="__codelineno-0-418"></a>
 <a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">        Raises:</span>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">            ValueError: on a non-positive ``cell_size``, a non-positive-area ``bounds``, an unknown ``mode``, or an</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">                unrecognised ``aggregate``.</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">        Examples:</span>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">            &gt;&gt;&gt; import numpy as np</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">            &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">            &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">            &gt;&gt;&gt; array.tolist()</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">            [[10.0, 20.0]]</span>
-<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        """</span>
-<a id="__codelineno-0-430" name="__codelineno-0-430"></a>        <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
-<a id="__codelineno-0-431" name="__codelineno-0-431"></a>            <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
-<a id="__codelineno-0-432" name="__codelineno-0-432"></a>        <span class="p">)</span>
-<a id="__codelineno-0-433" name="__codelineno-0-433"></a>
-<a id="__codelineno-0-434" name="__codelineno-0-434"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PointCloud</span><span class="p">:</span>
-<a id="__codelineno-0-435" name="__codelineno-0-435"></a><span class="w">        </span><span class="sd">"""Return a new cloud holding the selected points, every coordinate and attribute subset in step.</span>
-<a id="__codelineno-0-436" name="__codelineno-0-436"></a>
-<a id="__codelineno-0-437" name="__codelineno-0-437"></a><span class="sd">        Args:</span>
-<a id="__codelineno-0-438" name="__codelineno-0-438"></a><span class="sd">            selector: a boolean mask of length ``len(self)``, or an integer index array into the points.</span>
-<a id="__codelineno-0-439" name="__codelineno-0-439"></a>
-<a id="__codelineno-0-440" name="__codelineno-0-440"></a><span class="sd">        Returns:</span>
-<a id="__codelineno-0-441" name="__codelineno-0-441"></a><span class="sd">            A new, eager cloud. An attribute the cloud does not carry (an empty array) stays empty rather than</span>
-<a id="__codelineno-0-442" name="__codelineno-0-442"></a><span class="sd">            being indexed, so the empty-means-absent convention is preserved.</span>
-<a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">        """</span>
-<a id="__codelineno-0-444" name="__codelineno-0-444"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
-<a id="__codelineno-0-445" name="__codelineno-0-445"></a>        <span class="n">attributes</span> <span class="o">=</span> <span class="p">{</span>
-<a id="__codelineno-0-446" name="__codelineno-0-446"></a>            <span class="n">name</span><span class="p">:</span> <span class="n">values</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="n">values</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
-<a id="__codelineno-0-447" name="__codelineno-0-447"></a>        <span class="p">}</span>
-<a id="__codelineno-0-448" name="__codelineno-0-448"></a>        <span class="k">return</span> <span class="n">PointCloud</span><span class="p">(</span>
-<a id="__codelineno-0-449" name="__codelineno-0-449"></a>            <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">z</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">crs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="p">,</span> <span class="o">**</span><span class="n">attributes</span>
-<a id="__codelineno-0-450" name="__codelineno-0-450"></a>        <span class="p">)</span>
-<a id="__codelineno-0-451" name="__codelineno-0-451"></a>
-<a id="__codelineno-0-452" name="__codelineno-0-452"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-454" name="__codelineno-0-454"></a>
-<a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">        """</span>
-<a id="__codelineno-0-457" name="__codelineno-0-457"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-<a id="__codelineno-0-458" name="__codelineno-0-458"></a>
-<a id="__codelineno-0-459" name="__codelineno-0-459"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-461" name="__codelineno-0-461"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-462" name="__codelineno-0-462"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-463" name="__codelineno-0-463"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">            ValueError: on a non-positive ``cell_size``; a non-positive-area extent (a degenerate ``bounds``, or</span>
+<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">                the default extent of a flat cloud whose points share a single x or a single y); an unknown</span>
+<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">                ``mode``; or an unrecognised ``aggregate``.</span>
+<a id="__codelineno-0-423" name="__codelineno-0-423"></a>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        Examples:</span>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">            &gt;&gt;&gt; import numpy as np</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">            &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">            &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">            &gt;&gt;&gt; array.tolist()</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">            [[10.0, 20.0]]</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">        """</span>
+<a id="__codelineno-0-431" name="__codelineno-0-431"></a>        <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
+<a id="__codelineno-0-432" name="__codelineno-0-432"></a>            <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
+<a id="__codelineno-0-433" name="__codelineno-0-433"></a>        <span class="p">)</span>
+<a id="__codelineno-0-434" name="__codelineno-0-434"></a>
+<a id="__codelineno-0-435" name="__codelineno-0-435"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">_take</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">selector</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PointCloud</span><span class="p">:</span>
+<a id="__codelineno-0-436" name="__codelineno-0-436"></a><span class="w">        </span><span class="sd">"""Return a new cloud holding the selected points, every coordinate and attribute subset in step.</span>
+<a id="__codelineno-0-437" name="__codelineno-0-437"></a>
+<a id="__codelineno-0-438" name="__codelineno-0-438"></a><span class="sd">        Args:</span>
+<a id="__codelineno-0-439" name="__codelineno-0-439"></a><span class="sd">            selector: a boolean mask of length ``len(self)``, or an integer index array into the points.</span>
+<a id="__codelineno-0-440" name="__codelineno-0-440"></a>
+<a id="__codelineno-0-441" name="__codelineno-0-441"></a><span class="sd">        Returns:</span>
+<a id="__codelineno-0-442" name="__codelineno-0-442"></a><span class="sd">            A new, eager cloud. An attribute the cloud does not carry (an empty array) stays empty rather than</span>
+<a id="__codelineno-0-443" name="__codelineno-0-443"></a><span class="sd">            being indexed, so the empty-means-absent convention is preserved.</span>
+<a id="__codelineno-0-444" name="__codelineno-0-444"></a><span class="sd">        """</span>
+<a id="__codelineno-0-445" name="__codelineno-0-445"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span>
+<a id="__codelineno-0-446" name="__codelineno-0-446"></a>        <span class="n">attributes</span> <span class="o">=</span> <span class="p">{</span>
+<a id="__codelineno-0-447" name="__codelineno-0-447"></a>            <span class="n">name</span><span class="p">:</span> <span class="n">values</span><span class="p">[</span><span class="n">selector</span><span class="p">]</span> <span class="k">if</span> <span class="n">values</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="n">values</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">values</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_attributes</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+<a id="__codelineno-0-448" name="__codelineno-0-448"></a>        <span class="p">}</span>
+<a id="__codelineno-0-449" name="__codelineno-0-449"></a>        <span class="k">return</span> <span class="n">PointCloud</span><span class="p">(</span>
+<a id="__codelineno-0-450" name="__codelineno-0-450"></a>            <span class="n">x</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_x</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">y</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_y</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">z</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_z</span><span class="p">[</span><span class="n">selector</span><span class="p">],</span> <span class="n">crs</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="p">,</span> <span class="o">**</span><span class="n">attributes</span>
+<a id="__codelineno-0-451" name="__codelineno-0-451"></a>        <span class="p">)</span>
+<a id="__codelineno-0-452" name="__codelineno-0-452"></a>
+<a id="__codelineno-0-453" name="__codelineno-0-453"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="w">        </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-455" name="__codelineno-0-455"></a>
+<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">        Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-457" name="__codelineno-0-457"></a><span class="sd">        """</span>
+<a id="__codelineno-0-458" name="__codelineno-0-458"></a>        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<a id="__codelineno-0-459" name="__codelineno-0-459"></a>
+<a id="__codelineno-0-460" name="__codelineno-0-460"></a>    <span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="w">        </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-462" name="__codelineno-0-462"></a>        <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-463" name="__codelineno-0-463"></a>        <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-464" name="__codelineno-0-464"></a>        <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
               </details>
 
@@ -6576,17 +6583,17 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-452">452</a></span>
-<span class="normal"><a href="#__codelineno-0-453">453</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-453">453</a></span>
 <span class="normal"><a href="#__codelineno-0-454">454</a></span>
 <span class="normal"><a href="#__codelineno-0-455">455</a></span>
 <span class="normal"><a href="#__codelineno-0-456">456</a></span>
-<span class="normal"><a href="#__codelineno-0-457">457</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-452" name="__codelineno-0-452"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
-<a id="__codelineno-0-454" name="__codelineno-0-454"></a>
-<a id="__codelineno-0-455" name="__codelineno-0-455"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
-<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">    """</span>
-<a id="__codelineno-0-457" name="__codelineno-0-457"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="normal"><a href="#__codelineno-0-457">457</a></span>
+<span class="normal"><a href="#__codelineno-0-458">458</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-453" name="__codelineno-0-453"></a><span class="k">def</span><span class="w"> </span><span class="fm">__len__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-0-454" name="__codelineno-0-454"></a><span class="w">    </span><span class="sd">"""Return how many points are in memory, loading the records first if needed.</span>
+<a id="__codelineno-0-455" name="__codelineno-0-455"></a>
+<a id="__codelineno-0-456" name="__codelineno-0-456"></a><span class="sd">    Use :attr:`count` instead when the header's number is enough - that one is free.</span>
+<a id="__codelineno-0-457" name="__codelineno-0-457"></a><span class="sd">    """</span>
+<a id="__codelineno-0-458" name="__codelineno-0-458"></a>    <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">load</span><span class="p">()</span><span class="o">.</span><span class="n">_x</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -6609,15 +6616,15 @@ built from arrays it is the coordinates plus whichever attribute arrays are non-
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/pointclouds/points.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-459">459</a></span>
-<span class="normal"><a href="#__codelineno-0-460">460</a></span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"><a href="#__codelineno-0-460">460</a></span>
 <span class="normal"><a href="#__codelineno-0-461">461</a></span>
 <span class="normal"><a href="#__codelineno-0-462">462</a></span>
-<span class="normal"><a href="#__codelineno-0-463">463</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-459" name="__codelineno-0-459"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
-<a id="__codelineno-0-461" name="__codelineno-0-461"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
-<a id="__codelineno-0-462" name="__codelineno-0-462"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
-<a id="__codelineno-0-463" name="__codelineno-0-463"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
+<span class="normal"><a href="#__codelineno-0-463">463</a></span>
+<span class="normal"><a href="#__codelineno-0-464">464</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-460" name="__codelineno-0-460"></a><span class="k">def</span><span class="w"> </span><span class="fm">__repr__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-0-461" name="__codelineno-0-461"></a><span class="w">    </span><span class="sd">"""Describe the cloud without loading anything."""</span>
+<a id="__codelineno-0-462" name="__codelineno-0-462"></a>    <span class="n">crs</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span><span class="o">.</span><span class="n">to_string</span><span class="p">()</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crs</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+<a id="__codelineno-0-463" name="__codelineno-0-463"></a>    <span class="n">state</span> <span class="o">=</span> <span class="s2">"loaded"</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_loaded</span> <span class="k">else</span> <span class="s2">"lazy"</span>
+<a id="__codelineno-0-464" name="__codelineno-0-464"></a>    <span class="k">return</span> <span class="sa">f</span><span class="s2">"PointCloud(count=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">count</span><span class="si">}</span><span class="s2">, crs=</span><span class="si">{</span><span class="n">crs</span><span class="si">!r}</span><span class="s2">, </span><span class="si">{</span><span class="n">state</span><span class="si">}</span><span class="s2">)"</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
@@ -8065,8 +8072,9 @@ points inside the pixel contribute); see :mod:<code>pointclouds.ops.grid</code> 
             </td>
             <td>
               <div class="doc-md-description">
-                <p>on a non-positive <code>cell_size</code>, a non-positive-area <code>bounds</code>, an unknown <code>mode</code>, or an
-unrecognised <code>aggregate</code>.</p>
+                <p>on a non-positive <code>cell_size</code>; a non-positive-area extent (a degenerate <code>bounds</code>, or
+the default extent of a flat cloud whose points share a single x or a single y); an unknown
+<code>mode</code>; or an unrecognised <code>aggregate</code>.</p>
               </div>
             </td>
           </tr>
@@ -8125,7 +8133,8 @@ unrecognised <code>aggregate</code>.</p>
 <span class="normal"><a href="#__codelineno-0-429">429</a></span>
 <span class="normal"><a href="#__codelineno-0-430">430</a></span>
 <span class="normal"><a href="#__codelineno-0-431">431</a></span>
-<span class="normal"><a href="#__codelineno-0-432">432</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_grid</span><span class="p">(</span>
+<span class="normal"><a href="#__codelineno-0-432">432</a></span>
+<span class="normal"><a href="#__codelineno-0-433">433</a></span></pre></div></td><td class="code"><div><pre><span></span><code><a id="__codelineno-0-392" name="__codelineno-0-392"></a><span class="k">def</span><span class="w"> </span><span class="nf">to_grid</span><span class="p">(</span>
 <a id="__codelineno-0-393" name="__codelineno-0-393"></a>    <span class="bp">self</span><span class="p">,</span>
 <a id="__codelineno-0-394" name="__codelineno-0-394"></a>    <span class="o">*</span><span class="p">,</span>
 <a id="__codelineno-0-395" name="__codelineno-0-395"></a>    <span class="n">cell_size</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
@@ -8153,19 +8162,20 @@ unrecognised <code>aggregate</code>.</p>
 <a id="__codelineno-0-417" name="__codelineno-0-417"></a><span class="sd">        affine 6-tuple ``(xmin, cell_size, 0, ymax, 0, -cell_size)``, and the cloud's CRS.</span>
 <a id="__codelineno-0-418" name="__codelineno-0-418"></a>
 <a id="__codelineno-0-419" name="__codelineno-0-419"></a><span class="sd">    Raises:</span>
-<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        ValueError: on a non-positive ``cell_size``, a non-positive-area ``bounds``, an unknown ``mode``, or an</span>
-<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">            unrecognised ``aggregate``.</span>
-<a id="__codelineno-0-422" name="__codelineno-0-422"></a>
-<a id="__codelineno-0-423" name="__codelineno-0-423"></a><span class="sd">    Examples:</span>
-<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">        &gt;&gt;&gt; import numpy as np</span>
-<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">        &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
-<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
-<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        &gt;&gt;&gt; array.tolist()</span>
-<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">        [[10.0, 20.0]]</span>
-<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">    """</span>
-<a id="__codelineno-0-430" name="__codelineno-0-430"></a>    <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
-<a id="__codelineno-0-431" name="__codelineno-0-431"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
-<a id="__codelineno-0-432" name="__codelineno-0-432"></a>    <span class="p">)</span>
+<a id="__codelineno-0-420" name="__codelineno-0-420"></a><span class="sd">        ValueError: on a non-positive ``cell_size``; a non-positive-area extent (a degenerate ``bounds``, or</span>
+<a id="__codelineno-0-421" name="__codelineno-0-421"></a><span class="sd">            the default extent of a flat cloud whose points share a single x or a single y); an unknown</span>
+<a id="__codelineno-0-422" name="__codelineno-0-422"></a><span class="sd">            ``mode``; or an unrecognised ``aggregate``.</span>
+<a id="__codelineno-0-423" name="__codelineno-0-423"></a>
+<a id="__codelineno-0-424" name="__codelineno-0-424"></a><span class="sd">    Examples:</span>
+<a id="__codelineno-0-425" name="__codelineno-0-425"></a><span class="sd">        &gt;&gt;&gt; import numpy as np</span>
+<a id="__codelineno-0-426" name="__codelineno-0-426"></a><span class="sd">        &gt;&gt;&gt; ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))</span>
+<a id="__codelineno-0-427" name="__codelineno-0-427"></a><span class="sd">        &gt;&gt;&gt; array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))</span>
+<a id="__codelineno-0-428" name="__codelineno-0-428"></a><span class="sd">        &gt;&gt;&gt; array.tolist()</span>
+<a id="__codelineno-0-429" name="__codelineno-0-429"></a><span class="sd">        [[10.0, 20.0]]</span>
+<a id="__codelineno-0-430" name="__codelineno-0-430"></a><span class="sd">    """</span>
+<a id="__codelineno-0-431" name="__codelineno-0-431"></a>    <span class="k">return</span> <span class="n">_grid</span><span class="o">.</span><span class="n">to_grid</span><span class="p">(</span>
+<a id="__codelineno-0-432" name="__codelineno-0-432"></a>        <span class="bp">self</span><span class="p">,</span> <span class="n">cell_size</span><span class="o">=</span><span class="n">cell_size</span><span class="p">,</span> <span class="n">aggregate</span><span class="o">=</span><span class="n">aggregate</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">radius</span><span class="o">=</span><span class="n">radius</span><span class="p">,</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span><span class="p">,</span> <span class="n">nodata</span><span class="o">=</span><span class="n">nodata</span>
+<a id="__codelineno-0-433" name="__codelineno-0-433"></a>    <span class="p">)</span>
 </code></pre></div></td></tr></table></div>
             </details>
     </div>
