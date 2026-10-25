@@ -33,6 +33,9 @@ xyz = cloud.to_array(("X", "Y", "Z"))         # (N, 3) float64
 box = pc.PointCloud.read_window("survey.copc.laz", bbox=(155000, 463000, 156000, 464000))
 coarse = pc.PointCloud.read_window("survey.copc.laz", resolution=5.0)   # ~one point per 5 m
 
+# EPT (Entwine): same windowed read, by directory or URL (remote needs the [cloud] extra)
+box = pc.PointCloud.read_window("s3://bucket/survey-ept", bbox=(155000, 463000, 156000, 464000))
+
 ground = cloud.filter(classification=2)
 thin = ground.decimate(target=2_000_000, method="random")
 

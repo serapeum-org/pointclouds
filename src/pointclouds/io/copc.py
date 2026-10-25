@@ -359,34 +359,6 @@ def _as_bounds(bbox: tuple[float, float, float, float], header: laspy.LasHeader)
     )
 
 
-def _clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, float]) -> dict[str, np.ndarray]:
-    """Drop points outside ``bbox`` exactly, to the float edge.
-
-    laspy rounds the box edges to the file's coordinate scale before clipping, so its result can include points
-    up to half a scale unit outside the requested box - a whole boundary row, when an edge falls between grid
-    lines. This re-applies the box as an exact float mask, so the result matches the requested box to the float
-    edge rather than to the file's scale. The arrays are already in memory, so the mask is cheap.
-
-    **Both edges are inclusive** (``xmin <= x <= xmax``), so a point exactly on a boundary is kept - which is
-    what a zero-width point-query box needs. The consequence for tiling: two windows that share an edge each
-    include the points on that shared edge, so a caller stitching adjacent tiles must make its own boxes
-    half-open (or de-duplicate) to avoid counting the boundary twice.
-
-    Args:
-        arrays: the mapping from :func:`pointclouds.io._records.extract`; must contain ``x`` and ``y``.
-        bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS.
-
-    Returns:
-        The same mapping with every array masked to the points inside the box.
-    """
-    xmin, ymin, xmax, ymax = bbox
-    x, y = arrays["x"], arrays["y"]
-    keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
-    # An undeclared dimension is a zero-length array (the record contract); leave those untouched rather than
-    # index them with a full-length mask.
-    return {name: (values[keep] if values.size == keep.size else values) for name, values in arrays.items()}
-
-
 def read_window(
     source: Source,
     *,
@@ -557,7 +529,7 @@ def _query_window(
     points = reader.query(bounds=bounds, resolution=resolution, level=level)
     arrays = _records.extract(points, needed)
     if bbox is not None:
-        arrays = _clip_to_box(arrays, bbox)
+        arrays = _records.clip_to_box(arrays, bbox)
         arrays = {name: arrays[name] for name in requested}
     return arrays
 

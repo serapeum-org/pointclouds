@@ -1,4 +1,4 @@
-"""pointclouds - point cloud (LAS/LAZ/COPC) I/O, filtering, decimation and gridding.
+"""pointclouds - point cloud (LAS/LAZ/COPC/EPT) I/O, filtering, decimation and gridding.
 
 The public entry point is :class:`~pointclouds.points.PointCloud`. The GIS converters in
 :mod:`pointclouds.convert` require the optional ``[gis]`` extra; importing the package needs the core

@@ -1,10 +1,12 @@
 """The record-array contract shared by every reader in :mod:`pointclouds.io`.
 
-Both engines - the whole-file one in :mod:`pointclouds.io.las` and the windowed one in
-:mod:`pointclouds.io.copc` - hand :class:`~pointclouds.points.PointCloud` the same thing: a mapping of
-lower-case dimension name to array, with one entry per requested dimension and no missing keys. That contract
-lives here rather than in either engine, so the two cannot drift: a dimension added below is readable through
-both paths, and a window read maps onto ``PointCloud`` exactly as a full read does.
+Every engine - the whole-file one in :mod:`pointclouds.io.las` and the windowed ones in
+:mod:`pointclouds.io.copc` (COPC) and :mod:`pointclouds.io.ept` (EPT) - hands
+:class:`~pointclouds.points.PointCloud` the same thing: a mapping of lower-case dimension name to array, with
+one entry per requested dimension and no missing keys. That contract lives here rather than in any engine, so
+they cannot drift: a dimension added below is readable through every path, and a window read maps onto
+``PointCloud`` exactly as a full read does. The exact-box clip the two windowed engines share lives here too,
+for the same reason.
 
 Private to the package. Callers use the engines, not this module.
 """
@@ -15,7 +17,7 @@ from typing import Any, Protocol
 
 import numpy as np
 
-__all__ = ["CANONICAL", "declared_names", "extract", "resolve"]
+__all__ = ["CANONICAL", "clip_to_box", "declared_names", "extract", "resolve"]
 
 #: Record dimensions the engines map onto :class:`~pointclouds.points.PointCloud` fields, with the dtype each
 #: array is cast to. Keys are lower-case; callers may pass any case (``"X"`` and ``"x"`` are the same dimension).
@@ -165,3 +167,30 @@ def extract(source: _RecordSource, requested: tuple[str, ...]) -> dict[str, np.n
         else:
             arrays[name] = np.empty(0, dtype=dtype)
     return arrays
+
+
+def clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, float]) -> dict[str, np.ndarray]:
+    """Drop points outside ``bbox`` exactly, to the float edge. Shared by the COPC and EPT windowed engines.
+
+    Both windowed engines fetch at chunk / node granularity, so their raw result over-includes: COPC because
+    laspy rounds the box edges to the file's coordinate scale, EPT because a node's whole data file is fetched
+    when its cube overlaps the box. This re-applies the box as an exact float mask, so the result matches the
+    requested box to the float edge. The arrays are already in memory, so the mask is cheap.
+
+    **Both edges are inclusive** (``xmin <= x <= xmax``), so a point exactly on a boundary is kept - which is
+    what a zero-width point-query box needs. The consequence for tiling: two windows that share an edge each
+    include the points on that shared edge, so a caller stitching adjacent tiles must make its own boxes
+    half-open (or de-duplicate) to avoid counting the boundary twice.
+
+    Args:
+        arrays: a record mapping from :func:`extract`; must contain ``x`` and ``y``.
+        bbox: ``(xmin, ymin, xmax, ymax)`` in the data's CRS.
+
+    Returns:
+        The same mapping with every array masked to the points inside the box. A zero-length (undeclared)
+        dimension is left untouched rather than indexed with a full-length mask.
+    """
+    xmin, ymin, xmax, ymax = bbox
+    x, y = arrays["x"], arrays["y"]
+    keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
+    return {name: (values[keep] if values.size == keep.size else values) for name, values in arrays.items()}

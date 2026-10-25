@@ -17,6 +17,7 @@ _CORE_MODULES = [
     "pointclouds.points",
     "pointclouds.io.las",
     "pointclouds.io.copc",
+    "pointclouds.io.ept",
     "pointclouds.io._records",
     "pointclouds.ops.grid",
     "pointclouds.ops.filter",

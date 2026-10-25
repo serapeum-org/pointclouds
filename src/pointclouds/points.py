@@ -21,6 +21,7 @@ eager and carries no header, so its ``count`` and ``bounds`` describe the window
 from __future__ import annotations
 
 import warnings
+import os
 from pathlib import Path
 from typing import Literal
 
@@ -29,6 +30,7 @@ from pyproj import CRS, Transformer
 from pyproj.transformer import TransformerGroup
 
 from pointclouds.io import copc as _copc
+from pointclouds.io import ept as _ept
 from pointclouds.io import las as _las
 
 __all__ = ["PointCloud"]
@@ -179,45 +181,48 @@ class PointCloud:
     @classmethod
     def read_window(
         cls,
-        source: _copc.Source,
+        source: _copc.Source | _ept.Source,
         *,
         bbox: tuple[float, float, float, float] | None = None,
         resolution: float | None = None,
         level: int | range | None = None,
         dimensions: tuple[str, ...] | None = None,
     ) -> PointCloud:
-        """Read only part of a COPC cloud, using its octree instead of decompressing everything.
+        """Read only part of a cloud-optimised source - a COPC file or an EPT dataset - using its octree.
 
-        This is the path a large cloud is meant to be read through: ``bbox`` prunes the octree to the chunks
-        whose voxels overlap the box, and ``resolution`` stops the descent at the coarsest level that still
-        satisfies it. Reading the whole cloud and masking it afterwards costs the full decompression; this does
-        not.
+        This is the path a large cloud is meant to be read through: ``bbox`` prunes the octree to the nodes
+        whose cube overlaps the box, and ``resolution`` stops the descent at the coarsest level that still
+        satisfies it. Reading the whole thing and masking it afterwards costs the full decode; this does not.
+
+        The source is dispatched by shape: an EPT dataset (a directory or URL holding an ``ept.json``) goes to
+        :func:`pointclouds.io.ept.read_window`, anything else to :func:`pointclouds.io.copc.read_window`.
 
         The returned cloud is **eager and header-less**: :attr:`count` and :attr:`bounds` describe the points
-        actually read, not the file they came from. Use :func:`pointclouds.io.copc.read_header` for the file's
-        own count, bounds and root spacing.
+        actually read, not the file they came from. Use :func:`pointclouds.io.copc.read_header` /
+        :func:`pointclouds.io.ept.read_header` for the source's own count, bounds and resolution.
 
         Args:
-            source: the COPC file, as a path or an open file object. A file object is how a remote cloud is
-                read - open it with ``fsspec`` (the ``[cloud]`` extra) and pass it in.
-            bbox: ``(xmin, ymin, xmax, ymax)`` in the file's CRS. 2-D: the full z range is kept.
-            resolution: target point spacing, in the data's units, measured against the octree's root spacing.
-                Mutually exclusive with ``level``.
-            level: an exact octree level, or a ``range`` of them. Mutually exclusive with ``resolution``.
+            source: a COPC file (path or open file object) or an EPT dataset (path or URL to the directory or
+                its ``ept.json``). A remote source goes through ``fsspec`` (the ``[cloud]`` extra).
+            bbox: ``(xmin, ymin, xmax, ymax)`` in the source's CRS. 2-D: the full z range is kept.
+            resolution: target point spacing, measured against the octree's root spacing (COPC) or ``span``
+                (EPT). Mutually exclusive with ``level``.
+            level: the level-of-detail knob. For COPC, an exact octree level or a ``range``. For EPT, an ``int``
+                read as a maximum depth (``0`` = root), inclusive; a ``range`` is not accepted for EPT. Mutually
+                exclusive with ``resolution``.
             dimensions: which attribute arrays to carry, case-insensitive. ``None`` reads every mapped
                 dimension; ``x`` / ``y`` / ``z`` are always read whatever is asked for, since a cloud needs its
-                coordinates. See :func:`pointclouds.io.copc.read_window` - this selects what is returned, not
-                what laspy decompresses.
+                coordinates. Selects what is returned, not what is decoded.
 
         Returns:
-            A cloud holding only the selected points, with the file's CRS. A window that selects nothing gives
+            A cloud holding only the selected points, with the source's CRS. A window that selects nothing gives
             an empty cloud, whose :attr:`count` is ``0``.
 
         Raises:
             FileNotFoundError: when the path does not exist.
-            ValueError: when the suffix is not ``.laz``; when the file carries no COPC octree; when ``bbox`` is
-                malformed; when ``resolution`` is not positive; or when ``resolution`` and ``level`` are both
-                given.
+            ValueError: when the source is malformed for its kind; when ``bbox`` is malformed; when
+                ``resolution`` is not positive; when ``resolution`` and ``level`` are both given; or when
+                ``level`` is a ``range`` against an EPT source.
 
         Examples:
             A box reads a corner of the cloud, and the resulting cloud describes the window it holds:
@@ -227,30 +232,26 @@ class PointCloud:
             ... )
             >>> window.count  # 121 of the file's 1600 points  # doctest: +SKIP
             121
-            >>> window.bounds  # doctest: +SKIP
-            (155000.0, 463000.0, 155020.0, 463020.0)
 
-            A resolution thins the whole extent instead, which is what a zoomed-out view wants:
+            An EPT dataset reads the same way, by directory:
 
-            >>> coarse = PointCloud.read_window("examples/data/sample.copc.laz", resolution=7.8)  # doctest: +SKIP
+            >>> coarse = PointCloud.read_window("examples/data/sample-ept", resolution=50.0)  # doctest: +SKIP
             >>> coarse.count, coarse.crs.to_epsg()  # doctest: +SKIP
             (100, 28992)
-
-            A window that selects nothing is an empty cloud, not an error:
-
-            >>> nothing = PointCloud.read_window(  # doctest: +SKIP
-            ...     "examples/data/sample.copc.laz", bbox=(0, 0, 1, 1)
-            ... )
-            >>> nothing.count  # doctest: +SKIP
-            0
         """
         # x/y/z are forced into the request: a cloud is built from its coordinates, so a caller asking only for
         # an attribute still needs them. The result is then splatted into the constructor, which is safe because
         # the record contract's keys are exactly the constructor's point parameters (asserted in the tests).
         requested = None if dimensions is None else tuple(dict.fromkeys(("x", "y", "z", *dimensions)))
-        crs, arrays = _copc._read_window_with_crs(
-            source, bbox=bbox, resolution=resolution, level=level, dimensions=requested
-        )
+        # EPT sources are only ever a path or URL (a directory holding ept.json); a file object is always COPC.
+        if isinstance(source, (str, os.PathLike)) and _ept.is_ept(source):
+            crs, arrays = _ept._read_window_with_crs(
+                source, bbox=bbox, resolution=resolution, depth=_ept_depth(level), dimensions=requested
+            )
+        else:
+            crs, arrays = _copc._read_window_with_crs(
+                source, bbox=bbox, resolution=resolution, level=level, dimensions=requested
+            )
         return cls(crs=crs, **arrays)
 
     def load(self) -> PointCloud:
@@ -574,3 +575,27 @@ def _as_attribute(values: np.ndarray | None, dtype: type) -> np.ndarray:
     if values is None:
         return np.empty(0, dtype=dtype)
     return np.asarray(values, dtype=dtype)
+
+
+def _ept_depth(level: int | range | None) -> int | None:
+    """Translate the unified ``level`` argument to the EPT ``depth`` (a maximum octree depth).
+
+    COPC takes an exact level or a range; EPT takes a maximum depth. An ``int`` level maps straight to that
+    maximum depth. A ``range`` has no EPT equivalent, so it is refused rather than guessed.
+
+    Args:
+        level: the ``level`` argument from :meth:`PointCloud.read_window`.
+
+    Returns:
+        The EPT ``depth`` (an ``int``), or ``None`` when ``level`` is ``None``.
+
+    Raises:
+        ValueError: when ``level`` is a ``range`` - EPT reads down to a single maximum depth, so pass an int
+            level or a resolution instead.
+    """
+    if isinstance(level, range):
+        raise ValueError(
+            "an EPT source takes a maximum depth, not a level range; pass level=<int> (a max depth) or "
+            "resolution=<spacing>"
+        )
+    return level
