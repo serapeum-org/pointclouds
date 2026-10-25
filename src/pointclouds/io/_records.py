@@ -152,7 +152,11 @@ def extract(source: _RecordSource, requested: tuple[str, ...]) -> dict[str, np.n
     for name in requested:
         dtype = CANONICAL[name]
         if name in _COORDINATES or name in declared:
-            arrays[name] = np.asarray(getattr(source, name), dtype=dtype)
+            # Always a copy, never a view. np.asarray would alias when the dtype already matches, and on the
+            # COPC path the source is one packed record buffer - a view would keep the whole buffer alive behind
+            # a single-column result and let a caller mutate the source through it. The two engines must agree,
+            # and the LAS path copies, so this one does too.
+            arrays[name] = np.array(getattr(source, name), dtype=dtype, copy=True)
         else:
             arrays[name] = np.empty(0, dtype=dtype)
     return arrays

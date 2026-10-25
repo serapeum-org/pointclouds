@@ -225,9 +225,8 @@ class TestExtract:
     def test_a_dtype_change_copies_rather_than_aliasing(self, full_source):
         """Casting to the canonical dtype yields a new array, not a view onto the source.
 
-        This is deliberately the narrow claim: a dimension already of the right dtype *is* passed through as a
-        view, which is what keeps a large cloud from being duplicated. laspy builds its scaled coordinate
-        arrays per access, so nothing shared is at risk there.
+        The dtype-change case is the easy one - a cast always copies. The harder matching-dtype case is covered
+        by TestExtractAlwaysCopies, since `extract` copies on every path regardless.
 
         Test scenario:
             A float64 intensity source comes back as uint16, which forces a copy; writing to the result must
@@ -245,3 +244,24 @@ class TestExtract:
         arrays["intensity"][0] = 99
 
         assert source.intensity[0] == 10.0, "extract must not hand back a view onto the source"
+
+
+class TestExtractAlwaysCopies:
+    """`extract` must own its arrays on every path, so the two engines cannot drift (M5)."""
+
+    def test_a_matching_dtype_still_returns_an_independent_array(self):
+        """Even when no cast is needed, the result is a copy - not a view aliasing the source record.
+
+        On the COPC path the source is one packed record buffer; returning a view would keep the whole buffer
+        alive behind a one-column result and let a caller mutate the source through it. The LAS path already
+        copies, so the shared contract has to copy too.
+        """
+        values = np.array([2, 5], dtype=np.uint8)
+        source = _Source(_PointFormat("X", "Y", "Z", "classification"),
+                         x=np.zeros(2), y=np.zeros(2), z=np.zeros(2), classification=values)
+
+        arrays = _records.extract(source, ("classification",))
+        arrays["classification"][0] = 99
+
+        assert values[0] == 2, "extract returned a view; mutating the result reached the source"
+        assert arrays["classification"].base is None, "the returned array should own its data"
