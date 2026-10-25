@@ -36,6 +36,12 @@ from datetime import date
 from pathlib import Path
 
 import laspy
+
+# lazrs is used directly here to compress the per-node chunks; it is not a declared dependency of the package
+# but arrives with laspy[lazrs]. LasZipVlr and VLRList are laspy internals with no stability guarantee - this
+# script is the one place that reaches for them, and the generator test is what catches a laspy move that breaks
+# them. This module is run as a script (`python examples/data/make_copc_sample.py`), which puts its own
+# directory on sys.path so the sibling `make_sample` import below resolves; running it as `python -m` would not.
 import lazrs
 import numpy as np
 from laspy.vlrs.known import LasZipVlr
@@ -137,19 +143,21 @@ def assign_nodes(
 
 
 def compress_nodes(
-    record: np.ndarray, nodes: list[tuple[tuple[int, int, int, int], np.ndarray]]
+    record: np.ndarray, nodes: list[tuple[tuple[int, int, int, int], np.ndarray]], laz_vlr: "lazrs.LazVlr"
 ) -> tuple[bytes, list[tuple[int, int]]]:
     """Compress each node's points into its own LAZ chunk, in one contiguous block.
 
     Args:
         record: the packed point record array, one row per point.
         nodes: the node list from :func:`assign_nodes`.
+        laz_vlr: the chunk-layout descriptor. The *same* object must go into the header's LASzip VLR, or the
+            header would describe a different layout than the one the points were compressed with - built once
+            in :func:`write` and passed to both.
 
     Returns:
         ``(point_data, spans)`` - the bytes that go at the file's point-data offset, and one
         ``(start, size)`` pair per node, as offsets *within* that block.
     """
-    laz_vlr = lazrs.LazVlr.new_for_compression(POINT_FORMAT, 0, True)  # True: variable-size chunks, per COPC
     destination = io.BytesIO()
     compressor = lazrs.LasZipCompressor(destination, laz_vlr)
     compressor.reserve_offset_to_chunk_table()
@@ -226,7 +234,10 @@ def write(path: Path) -> int:
     las = build_las(arrays)
     centre, halfsize = root_cube(arrays)
     nodes = assign_nodes(arrays, centre, halfsize)
-    point_data, spans = compress_nodes(las.points.array, nodes)
+    # Build the LAZ chunk-layout descriptor once (True = variable-size chunks, as COPC requires) and use the
+    # same object for the point compression and the header's LASzip VLR, so the two cannot disagree.
+    laz_vlr = lazrs.LazVlr.new_for_compression(POINT_FORMAT, 0, True)
+    point_data, spans = compress_nodes(las.points.array, nodes, laz_vlr)
 
     # The root holds `len(root)` points spread over the full extent, so this is their mean spacing - the honest
     # number for the info VLR, and the one `resolution=` is compared against.
@@ -239,7 +250,7 @@ def write(path: Path) -> int:
     # The COPC info VLR goes first, ahead of the WKT VLR `add_crs` left in the list.
     info_vlr = laspy.VLR("copc", 1, "COPC info", b"\0" * COPC_INFO_SIZE)
     header.vlrs.insert(0, info_vlr)
-    header.vlrs.append(LasZipVlr(lazrs.LazVlr.new_for_compression(POINT_FORMAT, 0, True).record_data()))
+    header.vlrs.append(LasZipVlr(laz_vlr.record_data()))
 
     # Two passes: the first learns `offset_to_point_data`, which the hierarchy's absolute offsets need, and the
     # hierarchy's own position in turn goes back into the info VLR. Both VLRs keep their size, so the second

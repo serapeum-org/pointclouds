@@ -9,6 +9,7 @@ chunk, which is the only thing a windowed read is for.
 from __future__ import annotations
 
 import io
+import sys
 
 import numpy as np
 import pytest
@@ -368,7 +369,12 @@ class TestTheFixtureItself:
         shift bytes without breaking anything that matters here.
         """
         monkeypatch.syspath_prepend(str(data_dir))  # the generator imports its sibling make_sample
-        make_copc_sample = pytest.importorskip("make_copc_sample")
+        # A plain import, not importorskip: an ImportError is exactly the laspy-internals breakage this test
+        # exists to catch (the generator imports LasZipVlr and VLRList), so it must fail, not skip. Clean the
+        # modules out of sys.modules afterwards so they do not leak to another test from a now-off-path dir.
+        monkeypatch.delitem(sys.modules, "make_copc_sample", raising=False)
+        monkeypatch.delitem(sys.modules, "make_sample", raising=False)
+        import make_copc_sample
 
         regenerated = tmp_path / "sample.copc.laz"
         written = make_copc_sample.write(regenerated)
