@@ -388,7 +388,7 @@ class PointCloud:
         except KeyError as exc:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
         width = len(self._x)
-        empty = [name for name, col in zip(dimensions, cols) if col.size != width]
+        empty = [name for name, col in zip(dimensions, cols, strict=True) if col.size != width]
         if empty:
             raise ValueError(
                 f"cannot stack dimension(s) {empty} - this cloud carries none of them ({width} points, but "

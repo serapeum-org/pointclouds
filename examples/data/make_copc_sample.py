@@ -144,7 +144,7 @@ def assign_nodes(
 
 
 def compress_nodes(
-    record: np.ndarray, nodes: list[tuple[tuple[int, int, int, int], np.ndarray]], laz_vlr: "lazrs.LazVlr"
+    record: np.ndarray, nodes: list[tuple[tuple[int, int, int, int], np.ndarray]], laz_vlr: lazrs.LazVlr
 ) -> tuple[bytes, list[tuple[int, int]]]:
     """Compress each node's points into its own LAZ chunk, in one contiguous block.
 

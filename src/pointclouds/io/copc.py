@@ -36,7 +36,6 @@ transfer out of band.
 
 from __future__ import annotations
 
-import io
 import math
 import os
 from collections.abc import Iterator
@@ -156,9 +155,7 @@ def _resolve(source: Source) -> Path | FileObject:
     if not isinstance(source, (str, os.PathLike)) and _is_file_object(source):
         return source
     if not isinstance(source, (str, os.PathLike)):
-        raise TypeError(
-            f"source must be a path or a file object with read/seek/tell; got {type(source).__name__}"
-        )
+        raise TypeError(f"source must be a path or a file object with read/seek/tell; got {type(source).__name__}")
     resolved = Path(source)
     if resolved.suffix.lower() not in _SUFFIXES:
         raise ValueError(

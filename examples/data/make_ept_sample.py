@@ -33,7 +33,6 @@ Keep it deterministic: the tests assert on exact counts and bounds.
 from __future__ import annotations
 
 import json
-import struct
 from pathlib import Path
 
 import laspy
@@ -167,8 +166,14 @@ def manifest(data_type: str, cube_min: np.ndarray, side: float, arrays: dict[str
     xyz_max = [float(arrays["x"].max()), float(arrays["y"].max()), float(arrays["z"].max())]
     schema = binary_schema() if data_type == "binary" else [{"name": d["name"]} for d in binary_schema()]
     return {
-        "bounds": [float(cube_min[0]), float(cube_min[1]), float(cube_min[2]),
-                   float(cube_max[0]), float(cube_max[1]), float(cube_max[2])],
+        "bounds": [
+            float(cube_min[0]),
+            float(cube_min[1]),
+            float(cube_min[2]),
+            float(cube_max[0]),
+            float(cube_max[1]),
+            float(cube_max[2]),
+        ],
         "boundsConforming": [xyz_min[0], xyz_min[1], xyz_min[2], xyz_max[0], xyz_max[1], xyz_max[2]],
         "dataType": data_type,
         "hierarchyType": "json",

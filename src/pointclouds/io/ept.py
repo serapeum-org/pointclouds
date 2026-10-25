@@ -31,7 +31,6 @@ import io
 import json
 import math
 import os
-from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -452,9 +451,7 @@ def _binary_dtype(schema: list[dict[str, Any]]) -> np.dtype:
     return np.dtype(fields)
 
 
-def _decode_binary(
-    data: bytes, schema: list[dict[str, Any]], requested: tuple[str, ...]
-) -> dict[str, np.ndarray]:
+def _decode_binary(data: bytes, schema: list[dict[str, Any]], requested: tuple[str, ...]) -> dict[str, np.ndarray]:
     """Decode a ``binary`` node into the requested record arrays, applying each dimension's scale/offset.
 
     Args:
@@ -688,9 +685,7 @@ def _window_from(
     hierarchy = _Hierarchy(store)
     keys = _select_nodes(hierarchy, _root_cube(manifest), bbox, _max_depth(manifest, resolution, depth))
 
-    parts = [
-        _decode(store.read_bytes(f"ept-data/{key}.{extension}"), data_type, schema, needed) for key in keys
-    ]
+    parts = [_decode(store.read_bytes(f"ept-data/{key}.{extension}"), data_type, schema, needed) for key in keys]
     arrays = _concatenate(parts, needed)
     if bbox is not None:
         arrays = _records.clip_to_box(arrays, bbox)

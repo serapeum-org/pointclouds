@@ -257,8 +257,13 @@ class TestExtractAlwaysCopies:
         copies, so the shared contract has to copy too.
         """
         values = np.array([2, 5], dtype=np.uint8)
-        source = _Source(_PointFormat("X", "Y", "Z", "classification"),
-                         x=np.zeros(2), y=np.zeros(2), z=np.zeros(2), classification=values)
+        source = _Source(
+            _PointFormat("X", "Y", "Z", "classification"),
+            x=np.zeros(2),
+            y=np.zeros(2),
+            z=np.zeros(2),
+            classification=values,
+        )
 
         arrays = _records.extract(source, ("classification",))
         arrays["classification"][0] = 99

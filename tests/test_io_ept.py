@@ -248,7 +248,7 @@ class TestRejections:
         (tmp_path / "ept-data").mkdir()
         (tmp_path / "ept.json").write_text(json.dumps(manifest))
         (tmp_path / "ept-hierarchy" / "0-0-0-0.json").write_text(
-            ((sample_ept / "ept-hierarchy" / "0-0-0-0.json").read_text())
+            (sample_ept / "ept-hierarchy" / "0-0-0-0.json").read_text()
         )
         (tmp_path / "ept-data" / "0-0-0-0.bin").write_bytes(b"")
 
@@ -468,8 +468,9 @@ class TestSrsVariants:
     def test_a_wkt_srs_is_parsed(self, tmp_path):
         """A WKT srs is read into a pyproj CRS."""
         root = tmp_path / "wkt"
-        _write_binary_ept(root, {"0-0-0-0": {"0-0-0-0": 1}}, {"0-0-0-0": [(1, 1, 1)]},
-                          srs={"wkt": CRS.from_epsg(28992).to_wkt()})
+        _write_binary_ept(
+            root, {"0-0-0-0": {"0-0-0-0": 1}}, {"0-0-0-0": [(1, 1, 1)]}, srs={"wkt": CRS.from_epsg(28992).to_wkt()}
+        )
 
         assert ept.read_header(root).crs.to_epsg() == 28992
 
