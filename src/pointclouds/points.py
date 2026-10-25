@@ -16,6 +16,7 @@ via :meth:`PointCloud.load`. The distinction that matters, and the reason ``coun
 from __future__ import annotations
 
 import warnings
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -24,6 +25,11 @@ from pyproj import CRS, Transformer
 from pyproj.transformer import TransformerGroup
 
 from pointclouds.io import las as _las
+from pointclouds.ops import clip as _clip
+from pointclouds.ops import decimate as _decimate
+from pointclouds.ops import filter as _filter
+from pointclouds.ops import grid as _grid
+from pointclouds.ops import merge as _merge
 
 __all__ = ["PointCloud"]
 
@@ -81,7 +87,8 @@ class PointCloud:
             crs: anything :class:`pyproj.CRS` accepts, or ``None``.
 
         Raises:
-            ValueError: if ``x``, ``y`` and ``z`` do not all share one length.
+            ValueError: if ``x``, ``y`` and ``z`` do not all share one length, or if an attribute array is
+                neither empty (absent) nor exactly one value per point.
         """
         self._x = np.asarray(x, dtype=np.float64)
         self._y = np.asarray(y, dtype=np.float64)
@@ -99,6 +106,9 @@ class PointCloud:
         n = len(self._x)
         if not (len(self._y) == n and len(self._z) == n):
             raise ValueError(f"x/y/z must share a length; got {len(self._x)}, {len(self._y)}, {len(self._z)}")
+        for name, values in self._attributes.items():
+            if values.size and values.size != n:
+                raise ValueError(f"{name} has length {values.size}, expected 0 or {n}")
 
     @classmethod
     def read_file(cls, path: str | Path, *, lazy: bool = True) -> PointCloud:
@@ -255,6 +265,196 @@ class PointCloud:
         except KeyError as exc:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
         return np.column_stack(cols)
+
+    def filter(
+        self,
+        *,
+        classification: int | Iterable[int] | None = None,
+        return_number: int | Iterable[int] | None = None,
+        intensity: int | Iterable[int] | None = None,
+        bbox: tuple[float, float, float, float] | None = None,
+    ) -> PointCloud:
+        """Keep the points matching every given criterion, returning a new cloud.
+
+        Each attribute criterion is a membership test - a scalar keeps points equal to it, an iterable keeps
+        points whose value is in the set - and the criteria are ANDed together. Passing no criterion returns a
+        copy of the whole cloud.
+
+        Args:
+            classification: an ASPRS class code, or an iterable of them, to keep (e.g. ``2`` for ground).
+            return_number: a return number, or an iterable of them, to keep.
+            intensity: an intensity value, or an iterable of them, to keep.
+            bbox: ``(xmin, ymin, xmax, ymax)`` extent to keep, edges included.
+
+        Returns:
+            A new cloud holding only the matching points, every array subset in step. The original is untouched.
+
+        Raises:
+            ValueError: when a criterion names an attribute this cloud does not carry, or ``bbox`` is malformed.
+
+        Examples:
+            >>> import numpy as np
+            >>> cloud = PointCloud(
+            ...     x=np.arange(4.0), y=np.zeros(4), z=np.zeros(4),
+            ...     classification=np.array([2, 5, 2, 6], dtype=np.uint8),
+            ... )
+            >>> len(cloud.filter(classification=2))
+            2
+        """
+        mask = _filter.build_mask(
+            self, classification=classification, return_number=return_number, intensity=intensity, bbox=bbox
+        )
+        return self._take(mask)
+
+    def decimate(
+        self,
+        *,
+        target: int | None = None,
+        fraction: float | None = None,
+        method: str = "random",
+        voxel_size: float | None = None,
+        seed: int | None = None,
+    ) -> PointCloud:
+        """Thin the cloud, returning a new cloud with fewer points.
+
+        Args:
+            target: for ``method="random"``, how many points to keep; never more than the cloud holds.
+            fraction: for ``method="random"``, the share of points to keep, in ``(0, 1]``. A positive fraction
+                over a non-empty cloud keeps at least one point.
+            method: ``"random"`` for a uniform sample without replacement, ``"voxel"`` for one point per cube.
+            voxel_size: for ``method="voxel"``, the cube edge length in CRS units.
+            seed: seeds the random sample so a run is reproducible; ignored by ``"voxel"``.
+
+        Returns:
+            A new, thinned cloud; the original is untouched. Point order is preserved.
+
+        Raises:
+            ValueError: when the arguments for the chosen method are missing, ambiguous, or out of range, or when
+                ``method`` is neither ``"random"`` nor ``"voxel"``.
+
+        Examples:
+            >>> import numpy as np
+            >>> cloud = PointCloud(x=np.arange(10.0), y=np.zeros(10), z=np.zeros(10))
+            >>> len(cloud.decimate(target=3, seed=0))
+            3
+        """
+        indices = _decimate.select_indices(
+            self, target=target, fraction=fraction, method=method, voxel_size=voxel_size, seed=seed
+        )
+        return self._take(indices)
+
+    def clip(
+        self,
+        *,
+        bbox: tuple[float, float, float, float] | None = None,
+        polygon: np.ndarray | None = None,
+    ) -> PointCloud:
+        """Keep the points inside an extent or a polygon, returning a new cloud.
+
+        Exactly one of ``bbox`` or ``polygon`` must be given. Both forms are pure numpy, so clipping needs no GIS
+        stack; see :mod:`pointclouds.ops.clip` for the scope of the polygon form (a single ring, no holes).
+
+        Args:
+            bbox: ``(xmin, ymin, xmax, ymax)`` extent, edges included.
+            polygon: an ``(M, 2)`` array of ``(x, y)`` vertices forming a single ring (closed or open).
+
+        Returns:
+            A new cloud holding only the points inside the region; the original is untouched.
+
+        Raises:
+            ValueError: when neither or both of ``bbox`` and ``polygon`` are given, or ``polygon`` is malformed.
+
+        Examples:
+            >>> import numpy as np
+            >>> cloud = PointCloud(x=np.array([0.0, 5.0, 9.0]), y=np.zeros(3), z=np.zeros(3))
+            >>> len(cloud.clip(bbox=(4.0, -1.0, 10.0, 1.0)))
+            2
+        """
+        mask = _clip.clip_mask(self, bbox=bbox, polygon=polygon)
+        return self._take(mask)
+
+    @classmethod
+    def merge(cls, clouds: Sequence[PointCloud]) -> PointCloud:
+        """Concatenate several clouds into one, rejecting a mix of CRSs.
+
+        A zero-point cloud (for example one that filtered to empty) is a no-op participant: it contributes no
+        points and takes no part in resolving the CRS or which attributes are present.
+
+        Args:
+            clouds: the clouds to merge, in order. Each is loaded if its records are not in memory yet.
+
+        Returns:
+            A new cloud holding every point from every input, in input order.
+
+        Raises:
+            ValueError: when ``clouds`` is empty, the clouds disagree on CRS, or an attribute is present on some
+                clouds but absent on others.
+
+        Examples:
+            >>> import numpy as np
+            >>> a = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2))
+            >>> b = PointCloud(x=np.ones(3), y=np.zeros(3), z=np.zeros(3))
+            >>> len(PointCloud.merge([a, b]))
+            5
+        """
+        return cls(**_merge.merge_arrays(clouds))
+
+    def to_grid(
+        self,
+        *,
+        cell_size: float,
+        aggregate: str = "mean",
+        mode: str = "bin",
+        radius: float | None = None,
+        bounds: tuple[float, float, float, float] | None = None,
+        nodata: float = np.nan,
+    ) -> tuple[np.ndarray, tuple[float, float, float, float, float, float], CRS | None]:
+        """Grid the cloud onto a regular raster surface, without GDAL.
+
+        The aggregation names follow PDAL's ``writers.gdal`` vocabulary, and the window defaults to ``"bin"`` (only
+        points inside the pixel contribute); see :mod:`pointclouds.ops.grid` for the full rationale.
+
+        Args:
+            cell_size: the pixel edge length in CRS units; must be positive.
+            aggregate: ``min``, ``max``, ``mean``, ``count``, ``stdev``, ``idw``, or a percentile ``p<n>``.
+            mode: ``"bin"`` (points inside the pixel) or ``"radius"`` (points within ``radius`` of the centre).
+            radius: the search radius for ``mode="radius"``; defaults to ``cell_size * sqrt(2)`` when ``None``.
+            bounds: ``(xmin, ymin, xmax, ymax)`` extent to grid; defaults to the cloud's own bounds.
+            nodata: the value written to empty cells (``count`` excepted, which writes ``0``).
+
+        Returns:
+            ``(array, transform, crs)``: an ``(nrows, ncols)`` float64 array with row 0 northernmost, a GDAL-style
+            affine 6-tuple ``(xmin, cell_size, 0, ymax, 0, -cell_size)``, and the cloud's CRS.
+
+        Raises:
+            ValueError: on a non-positive ``cell_size``; a non-positive-area extent (a degenerate ``bounds``, or
+                the default extent of a flat cloud whose points share a single x or a single y); an unknown
+                ``mode``; or an unrecognised ``aggregate``.
+
+        Examples:
+            >>> import numpy as np
+            >>> ground = PointCloud(x=np.array([0.5, 1.5]), y=np.array([0.5, 0.5]), z=np.array([10.0, 20.0]))
+            >>> array, _, _ = ground.to_grid(cell_size=1.0, aggregate="min", bounds=(0, 0, 2, 1))
+            >>> array.tolist()
+            [[10.0, 20.0]]
+        """
+        return _grid.to_grid(
+            self, cell_size=cell_size, aggregate=aggregate, mode=mode, radius=radius, bounds=bounds, nodata=nodata
+        )
+
+    def _take(self, selector: np.ndarray) -> PointCloud:
+        """Return a new cloud holding the selected points, every coordinate and attribute subset in step.
+
+        Args:
+            selector: a boolean mask of length ``len(self)``, or an integer index array into the points.
+
+        Returns:
+            A new, eager cloud. An attribute the cloud does not carry (an empty array) stays empty rather than
+            being indexed, so the empty-means-absent convention is preserved.
+        """
+        self.load()
+        attributes = {name: values[selector] if values.size else values for name, values in self._attributes.items()}
+        return PointCloud(x=self._x[selector], y=self._y[selector], z=self._z[selector], crs=self._crs, **attributes)
 
     def to_crs(
         self,

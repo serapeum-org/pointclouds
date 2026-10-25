@@ -30,6 +30,16 @@ class TestConstruction:
         with pytest.raises(ValueError, match="must share a length"):
             PointCloud(x=np.zeros(3), y=np.zeros(2), z=np.zeros(3))
 
+    def test_an_attribute_array_must_match_the_point_count(self):
+        """An attribute array is either empty (absent) or one value per point; any other length is refused."""
+        with pytest.raises(ValueError, match="classification has length 4, expected 0 or 3"):
+            PointCloud(
+                x=np.zeros(3),
+                y=np.zeros(3),
+                z=np.zeros(3),
+                classification=np.array([2, 5, 6, 7], dtype=np.uint8),
+            )
+
     def test_absent_attributes_become_empty_arrays(self, tiny_cloud):
         """An attribute the caller did not supply is an empty array, never None."""
         assert tiny_cloud.intensity.size == 0

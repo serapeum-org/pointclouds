@@ -19,6 +19,8 @@ _CORE_MODULES = [
     "pointclouds.ops.grid",
     "pointclouds.ops.filter",
     "pointclouds.ops.decimate",
+    "pointclouds.ops.clip",
+    "pointclouds.ops.merge",
     "pointclouds.classify",
     "pointclouds.convert",  # importable without the extra; only calling a converter needs it
 ]

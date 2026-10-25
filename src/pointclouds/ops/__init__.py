@@ -1,1 +1,1 @@
-"""Operations on a point cloud: filter, decimate, grid."""
+"""Operations on a point cloud: filter, decimate, clip, merge, grid."""
