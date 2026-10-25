@@ -15,10 +15,12 @@ via :meth:`PointCloud.load`. The distinction that matters, and the reason ``coun
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import numpy as np
 from pyproj import CRS, Transformer
+from pyproj.transformer import TransformerGroup
 
 from pointclouds.io import las as _las
 
@@ -265,12 +267,12 @@ class PointCloud:
         unchanged, still in the source vertical datum. This is the right choice when the target is a 2-D
         horizontal CRS - there is no vertical transformation to apply - but it means a 3-D reprojection is never
         done implicitly. To shift z as well, pass ``vertical=True``; this requires a compound or 3-D CRS on both
-        sides (one that carries a vertical axis) and raises ``ValueError`` otherwise. The transform is then built
-        with ``only_best=True``: only the single most-accurate vertical operation is used, so if its grid (e.g. a
-        geoid model) is unavailable pyproj raises rather than falling back to a less-accurate operation or to one
-        that passes z through untouched. The trade-off is strict - a legitimate vertical reprojection is refused
-        on an install lacking that grid - but it guarantees z is never silently left in the source datum when a
-        vertical transform was asked for.
+        sides (one that carries a vertical axis) and raises ``ValueError`` otherwise. The most accurate vertical
+        operation is then used, and if its grid (e.g. a geoid model) is not installed the transform is refused
+        with ``ValueError`` rather than falling back to a less-accurate operation or to one that passes z through
+        untouched. The trade-off is strict - a legitimate vertical reprojection is refused on an install lacking
+        that grid - but it guarantees z is never silently left in the source datum when a vertical transform was
+        asked for, and it does so the same way on every pyproj/PROJ build.
 
         Out-of-domain points are an error, not a silent ``inf``: the transform runs with ``errcheck=True``, so a
         coordinate outside the transform's area of use raises ``ProjError``. This is all-or-nothing - a single
@@ -292,10 +294,11 @@ class PointCloud:
             A new, loaded :class:`PointCloud` in ``crs``, with x/y (and z when ``vertical``) transformed.
 
         Raises:
-            ValueError: when :attr:`crs` is ``None`` (no source CRS to transform from), or when ``vertical`` is
-                ``True`` but the source or target CRS carries no vertical axis.
-            pyproj.exceptions.ProjError: when a point falls outside the transform's domain, or when ``vertical``
-                is ``True`` and the required vertical-datum operation (e.g. a geoid grid) is unavailable.
+            ValueError: when :attr:`crs` is ``None`` (no source CRS to transform from); when ``vertical`` is
+                ``True`` but the source or target CRS carries no vertical axis; or when ``vertical`` is ``True``
+                and the required vertical-datum operation (e.g. a geoid grid) is not installed.
+            pyproj.exceptions.ProjError: when a point falls outside the transform's domain (a single such point
+                aborts the whole reprojection).
 
         Examples:
             - Reproject a Dutch RD New cloud into UTM zone 31N; the result reports the target CRS:
@@ -339,10 +342,19 @@ class PointCloud:
                 f"got source {self._crs.to_string()!r} and target {target.to_string()!r}. Refusing rather "
                 "than leaving z in the source datum."
             )
-        transformer = Transformer.from_crs(self._crs, target, always_xy=True, only_best=vertical)
         if vertical:
-            x, y, z = transformer.transform(self.x, self.y, self.z, errcheck=True)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")  # the "best unavailable" warning is turned into a raise below
+                group = TransformerGroup(self._crs, target, always_xy=True)
+            if not group.best_available:
+                raise ValueError(
+                    "vertical=True needs the most accurate vertical operation between "
+                    f"{self._crs.to_string()!r} and {target.to_string()!r}, but its grid (e.g. a geoid model) "
+                    "is not installed; refusing rather than leaving z in the source datum."
+                )
+            x, y, z = group.transformers[0].transform(self.x, self.y, self.z, errcheck=True)
         else:
+            transformer = Transformer.from_crs(self._crs, target, always_xy=True)
             x, y = transformer.transform(self.x, self.y, errcheck=True)
             z = self.z.copy()
         return PointCloud(

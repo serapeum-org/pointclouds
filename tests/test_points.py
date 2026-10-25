@@ -286,8 +286,10 @@ class TestToCrs:
         """A real datum shift either moves z or raises - it must never return z unchanged (H1).
 
         EPSG:4979 (ellipsoidal height) -> EPSG:7415 (RD New + NAP orthometric height) needs a geoid grid. When the
-        grid is present z changes by the geoid separation; when it is absent the transform is refused. The one
-        outcome ruled out is z passing through untouched, which the old best-effort transform did silently.
+        grid is present z changes by the geoid separation; when it is absent the transform is refused (the refusal
+        is deterministic across pyproj/PROJ builds - it keys off whether the best operation's grid is installed,
+        not off version-specific fallback behaviour). The one outcome ruled out is z passing through untouched,
+        which the old best-effort transform did silently.
         """
         import pyproj
 
@@ -295,7 +297,7 @@ class TestToCrs:
 
         try:
             out = cloud.to_crs("EPSG:7415", vertical=True)
-        except pyproj.exceptions.ProjError:
+        except (ValueError, pyproj.exceptions.ProjError):
             return
         assert out.z[0] != 0.0, "a vertical-datum shift must change z, never silently leave it in the source datum"
 
