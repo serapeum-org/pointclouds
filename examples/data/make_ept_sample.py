@@ -132,7 +132,14 @@ def write_binary_node(path: Path, arrays: dict[str, np.ndarray], sel: np.ndarray
     yi = np.round((arrays["y"][sel] - ORIGIN[1]) / BIN_SCALE).astype("<i4")
     zi = np.round((arrays["z"][sel] - 0.0) / BIN_SCALE).astype("<i4")
     dtype = np.dtype(
-        [("X", "<i4"), ("Y", "<i4"), ("Z", "<i4"), ("Intensity", "<u2"), ("ReturnNumber", "u1"), ("Classification", "u1")]
+        [
+            ("X", "<i4"),
+            ("Y", "<i4"),
+            ("Z", "<i4"),
+            ("Intensity", "<u2"),
+            ("ReturnNumber", "u1"),
+            ("Classification", "u1"),
+        ]
     )
     records = np.empty(sel.size, dtype=dtype)
     records["X"], records["Y"], records["Z"] = xi, yi, zi
