@@ -1,0 +1,47 @@
+{
+  "bounds": [
+    155000.0,
+    463000.0,
+    10.0,
+    155078.0,
+    463078.0,
+    88.0
+  ],
+  "boundsConforming": [
+    155000.0,
+    463000.0,
+    10.0,
+    155078.0,
+    463078.0,
+    25.995741687066666
+  ],
+  "dataType": "laszip",
+  "hierarchyType": "json",
+  "points": 1600,
+  "schema": [
+    {
+      "name": "X"
+    },
+    {
+      "name": "Y"
+    },
+    {
+      "name": "Z"
+    },
+    {
+      "name": "Intensity"
+    },
+    {
+      "name": "ReturnNumber"
+    },
+    {
+      "name": "Classification"
+    }
+  ],
+  "span": 128,
+  "srs": {
+    "authority": "EPSG",
+    "horizontal": "28992"
+  },
+  "version": "1.0.0"
+}

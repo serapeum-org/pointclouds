@@ -1,0 +1,65 @@
+{
+  "bounds": [
+    155000.0,
+    463000.0,
+    10.0,
+    155078.0,
+    463078.0,
+    88.0
+  ],
+  "boundsConforming": [
+    155000.0,
+    463000.0,
+    10.0,
+    155078.0,
+    463078.0,
+    25.995741687066666
+  ],
+  "dataType": "binary",
+  "hierarchyType": "json",
+  "points": 1600,
+  "schema": [
+    {
+      "name": "X",
+      "type": "signed",
+      "size": 4,
+      "scale": 0.01,
+      "offset": 155000.0
+    },
+    {
+      "name": "Y",
+      "type": "signed",
+      "size": 4,
+      "scale": 0.01,
+      "offset": 463000.0
+    },
+    {
+      "name": "Z",
+      "type": "signed",
+      "size": 4,
+      "scale": 0.01,
+      "offset": 0.0
+    },
+    {
+      "name": "Intensity",
+      "type": "unsigned",
+      "size": 2
+    },
+    {
+      "name": "ReturnNumber",
+      "type": "unsigned",
+      "size": 1
+    },
+    {
+      "name": "Classification",
+      "type": "unsigned",
+      "size": 1
+    }
+  ],
+  "span": 128,
+  "srs": {
+    "authority": "EPSG",
+    "horizontal": "28992"
+  },
+  "version": "1.0.0"
+}

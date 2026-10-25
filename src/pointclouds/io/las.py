@@ -6,8 +6,9 @@ Two entry points, deliberately separate, because the split is the point of the d
   constant whatever the file's size - a 40 GB tile answers as fast as a 40 KB one.
 - :func:`read_points` decompresses the record arrays, optionally only the dimensions asked for.
 
-Everything here imports with the core dependency set (numpy, laspy, pyproj). COPC/EPT windowed reads live in
-:mod:`pointclouds.io.copc` (T-16) and writing lands with T-13; neither belongs in this module.
+Everything here imports with the core dependency set (numpy, laspy, pyproj). Spatially-indexed windowed reads
+live in :mod:`pointclouds.io.copc` (T-16) and writing lands with T-13; neither belongs in this module. The
+record-array contract the two readers share is in :mod:`pointclouds.io._records`.
 """
 
 from __future__ import annotations
@@ -19,18 +20,9 @@ import laspy
 import numpy as np
 from pyproj import CRS
 
-__all__ = ["LasHeaderInfo", "read_header", "read_points"]
+from pointclouds.io import _records
 
-#: Record dimensions this engine maps onto :class:`~pointclouds.points.PointCloud` fields, with the dtype each
-#: array is cast to. Keys are lower-case; callers may pass any case (``"X"`` and ``"x"`` are the same dimension).
-_CANONICAL: dict[str, type] = {
-    "x": np.float64,
-    "y": np.float64,
-    "z": np.float64,
-    "intensity": np.uint16,
-    "classification": np.uint8,
-    "return_number": np.uint8,
-}
+__all__ = ["LasHeaderInfo", "read_header", "read_points"]
 
 _SUFFIXES = {".las", ".laz"}
 
@@ -123,19 +115,5 @@ def read_points(path: str | Path, dimensions: tuple[str, ...] | None = None) -> 
         KeyError: when a requested dimension is not one this engine knows.
     """
     resolved = _resolve(path)
-    requested = tuple(_CANONICAL) if dimensions is None else tuple(name.lower() for name in dimensions)
-    unknown = [name for name in requested if name not in _CANONICAL]
-    if unknown:
-        raise KeyError(f"unknown dimension(s) {unknown}; this engine reads {sorted(_CANONICAL)}")
-
-    las = laspy.read(resolved)
-    declared = {str(name).lower() for name in las.point_format.dimension_names}
-    arrays: dict[str, np.ndarray] = {}
-    for name in requested:
-        dtype = _CANONICAL[name]
-        # x/y/z are always present as scaled doubles; the attribute dimensions depend on the point format.
-        if name in ("x", "y", "z") or name in declared:
-            arrays[name] = np.asarray(getattr(las, name), dtype=dtype)
-        else:
-            arrays[name] = np.empty(0, dtype=dtype)
-    return arrays
+    requested = _records.resolve(dimensions)
+    return _records.extract(laspy.read(resolved), requested)
