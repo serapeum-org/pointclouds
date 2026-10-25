@@ -195,13 +195,17 @@ def _reduce_simple(aggregate: str, cell: np.ndarray, values: np.ndarray, ncells:
     occupied = count > 0
     if aggregate in ("mean", "stdev"):
         total = np.bincount(cell, weights=values, minlength=ncells)
-        mean = total[occupied] / count[occupied]
+        mean = np.zeros(ncells)
+        mean[occupied] = total[occupied] / count[occupied]
         if aggregate == "mean":
-            grid[occupied] = mean
+            grid[occupied] = mean[occupied]
         else:
-            sq = np.bincount(cell, weights=values * values, minlength=ncells)
-            variance = np.clip(sq[occupied] / count[occupied] - mean * mean, 0.0, None)
-            grid[occupied] = np.sqrt(variance)
+            # Two-pass variance about the per-cell mean. Stable where the one-pass sum-of-squares minus
+            # mean-squared catastrophically cancels for large-magnitude z (e.g. projected elevations near 1e9),
+            # and non-negative by construction, so no clip-to-zero is needed.
+            deviation = values - mean[cell]
+            sum_sq = np.bincount(cell, weights=deviation * deviation, minlength=ncells)
+            grid[occupied] = np.sqrt(sum_sq[occupied] / count[occupied])
     elif aggregate == "min":
         reduced = np.full(ncells, np.inf)
         np.minimum.at(reduced, cell, values)

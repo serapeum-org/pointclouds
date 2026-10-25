@@ -340,6 +340,14 @@ class TestToGrid:
 
         assert array[0, 0] == pytest.approx(nw_cell)
 
+    def test_stdev_is_numerically_stable_for_large_magnitude_z(self):
+        """Two-pass variance stays accurate where a sum-of-squares formula would cancel catastrophically."""
+        cloud = PointCloud(x=np.array([0.5, 0.5]), y=np.array([0.5, 0.5]), z=np.array([1.0e9, 1.0e9 + 2.0]))
+
+        array, _, _ = cloud.to_grid(cell_size=1.0, aggregate="stdev", bounds=(0.0, 0.0, 1.0, 1.0))
+
+        assert array[0, 0] == pytest.approx(1.0)
+
     def test_count_fills_empty_cells_with_zero(self, grid_cloud):
         """An empty cell honestly holds zero points, so count writes 0 there rather than nodata."""
         array, _, _ = grid_cloud.to_grid(cell_size=1.0, aggregate="count", bounds=self.BOUNDS)
