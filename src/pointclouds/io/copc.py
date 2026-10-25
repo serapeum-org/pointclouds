@@ -39,7 +39,7 @@ from pathlib import Path
 import laspy
 import numpy as np
 from laspy.copc import Bounds
-from laspy.errors import LaspyException
+from laspy.errors import LaspyException, LazError
 
 from pointclouds.io import _records
 from pointclouds.io.las import LasHeaderInfo
@@ -132,6 +132,11 @@ def _reader(source: Source) -> Iterator[laspy.CopcReader]:
         FileNotFoundError: when a path does not exist.
         ValueError: when the file carries no COPC octree - a plain LAS/LAZ, which :func:`read_window` cannot
             window and which :func:`pointclouds.io.las.read_points` should read instead.
+        laspy.errors.LazError: when the ``lazrs`` backend is missing. Re-raised unchanged rather than relabelled
+            "no octree", because the file is COPC - the environment cannot decompress it, and the whole-file
+            read the "no octree" message points at would fail for the same reason.
+        laspy.errors.LaspyException: for any other structural read failure (a truncated or corrupt file). Also
+            re-raised unchanged, for the same reason.
     """
     resolved = _resolve(source)
     if isinstance(resolved, io.IOBase):
@@ -145,7 +150,15 @@ def _reader(source: Source) -> Iterator[laspy.CopcReader]:
             reader = laspy.CopcReader(resolved, close_fd=False)
         else:
             reader = laspy.CopcReader.open(resolved)
+    except LazError:
+        # A missing lazrs backend is not "no octree" - the file is COPC, the environment just cannot read LAZ.
+        raise
     except LaspyException as exc:
+        # Only laspy's "not a valid COPC" means the file genuinely has no octree. Any other LaspyException is a
+        # structural read failure (e.g. a truncated file) and must not be relabelled into a misdirecting
+        # "read it whole instead" - that path would fail too.
+        if "not a valid COPC" not in str(exc):
+            raise
         label = resolved.name if isinstance(resolved, Path) else "the given file object"
         raise ValueError(
             f"{label} carries no COPC octree, so it cannot be read through a window; read it whole with "
@@ -158,17 +171,23 @@ def _reader(source: Source) -> Iterator[laspy.CopcReader]:
 def is_copc(source: Source) -> bool:
     """Report whether ``source`` carries a COPC octree.
 
-    This is the cheap question: it reads the header and its first VLR, never a point record.
+    This is the cheap question: it reads the header, the VLRs and the octree's root hierarchy page, never a
+    point record. On a remote source that is two range requests, not one - the root page sits past the point
+    data.
 
     Args:
         source: the file to inspect, as a path or an open file object.
 
     Returns:
-        ``True`` when the file is a valid COPC, ``False`` when it is a plain LAS/LAZ.
+        ``True`` when the file is a valid COPC, ``False`` when it is a plain LAS/LAZ with no octree.
 
     Raises:
         FileNotFoundError: when a path does not exist.
         ValueError: when a path's suffix is not ``.laz`` - an uncompressed ``.las`` is never COPC.
+        laspy.errors.LazError: when the ``lazrs`` backend is missing. A predicate must not answer ``False`` to a
+            question it could not evaluate, so a backend failure surfaces rather than being swallowed.
+        laspy.errors.LaspyException: when the file is structurally broken (truncated or corrupt) - distinct from
+            "a valid file with no octree", which is the only case that returns ``False``.
 
     Examples:
         An indexed cloud answers yes, and a plain LAZ answers no rather than raising - that is the question:

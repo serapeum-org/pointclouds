@@ -499,3 +499,44 @@ class TestBoundingBoxRobustness:
         assert arrays["x"].size > 0
         assert arrays["x"].min() >= xmin and arrays["x"].max() <= xmax
         assert arrays["y"].min() >= ymin and arrays["y"].max() <= ymax
+
+
+class TestErrorTranslation:
+    """`_reader` must only relabel a genuine "not a COPC" error, never a backend or corruption failure (H2)."""
+
+    def test_a_missing_lazrs_backend_is_not_reported_as_no_octree(self, sample_copc, monkeypatch):
+        """Without lazrs, the file is still COPC - the backend is missing, so say that, don't misdirect.
+
+        laspy raises `LazError` ("COPC support requires the 'lazrs' backend"), a `LaspyException` subclass. The
+        old blanket translation turned it into "carries no COPC octree ... read it whole", a fallback that also
+        fails because no lazrs means no LAZ at all.
+        """
+        monkeypatch.setattr(copc.laspy.copc, "lazrs", None)
+
+        with pytest.raises(copc.laspy.errors.LazError, match="lazrs"):
+            copc.read_window(sample_copc, bbox=CORNER_BBOX)
+
+    def test_is_copc_does_not_swallow_a_backend_error(self, sample_copc, monkeypatch):
+        """`is_copc` is a predicate; a missing backend must surface, not return a confidently wrong False."""
+        monkeypatch.setattr(copc.laspy.copc, "lazrs", None)
+
+        with pytest.raises(copc.laspy.errors.LazError):
+            copc.is_copc(sample_copc)
+
+    def test_a_truncated_file_is_not_reported_as_no_octree(self, sample_copc):
+        """A structurally broken file re-raises laspy's read error unchanged, not a misdirecting ValueError.
+
+        The old blanket translation turned "File is to small to be a valid LAS" into "carries no COPC octree ...
+        read it whole", which would also fail. The structural error must surface as itself.
+        """
+        truncated = io.BytesIO(sample_copc.read_bytes()[:200])
+
+        with pytest.raises(copc.laspy.errors.LaspyException) as excinfo:
+            copc.read_window(truncated, bbox=CORNER_BBOX)
+
+        assert "no COPC octree" not in str(excinfo.value), f"misdirecting message: {excinfo.value}"
+
+    def test_a_genuine_non_copc_still_says_so(self, sample_laz):
+        """The one case the translation is for: a valid LAZ with no octree keeps its helpful message."""
+        with pytest.raises(ValueError, match="carries no COPC octree"):
+            copc.read_window(sample_laz, bbox=CORNER_BBOX)
