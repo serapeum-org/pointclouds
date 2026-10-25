@@ -1,0 +1,107 @@
+"""Concatenate several clouds into one. (Phase 2 - T-9).
+
+:func:`merge_arrays` assembles the combined coordinate and attribute arrays and settles the CRS, then
+:meth:`PointCloud.merge` builds the cloud from them. Keeping the assembly here, separate from construction,
+avoids importing :class:`PointCloud` at module load. Pure numpy - no GDAL, no pyramids.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from pyproj import CRS
+
+    from pointclouds.points import PointCloud
+
+__all__ = ["merge_arrays"]
+
+#: The attribute dimensions that are carried through a merge, alongside x/y/z.
+_ATTRIBUTES = ("intensity", "classification", "return_number")
+
+
+def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
+    """Concatenate the clouds' arrays and resolve a single CRS.
+
+    A zero-point cloud is a no-op participant: it contributes no rows and takes no part in resolving the CRS or
+    in deciding which attributes are present, so it never turns a valid merge into a conflict.
+
+    Args:
+        clouds: the clouds to merge, in order; each is loaded if its records are not in memory yet.
+
+    Returns:
+        A mapping of ``PointCloud`` constructor keyword to value: ``x``/``y``/``z``, the ``crs``, and each
+        attribute that every point-carrying cloud has. An attribute no cloud carries is omitted; the CRS is the
+        one shared by the point-carrying clouds, or ``None`` when none carry points.
+
+    Raises:
+        ValueError: when ``clouds`` is empty, when the clouds disagree on CRS, or when an attribute is present
+            on some clouds but absent on others (so the concatenation would misalign).
+
+    Examples:
+        >>> import numpy as np
+        >>> from pointclouds import PointCloud
+        >>> a = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2))
+        >>> b = PointCloud(x=np.ones(3), y=np.zeros(3), z=np.zeros(3))
+        >>> arrays = merge_arrays([a, b])
+        >>> arrays["x"].tolist()
+        [0.0, 0.0, 1.0, 1.0, 1.0]
+        >>> sorted(arrays)
+        ['crs', 'x', 'y', 'z']
+    """
+    clouds = list(clouds)
+    if not clouds:
+        raise ValueError("merge needs at least one cloud")
+
+    point_counts = [c.x.shape[0] for c in clouds]  # also forces any lazy cloud to load
+    carrying = [c for c, count in zip(clouds, point_counts, strict=True) if count > 0]
+    merged: dict[str, Any] = {
+        "x": np.concatenate([c.x for c in clouds]),
+        "y": np.concatenate([c.y for c in clouds]),
+        "z": np.concatenate([c.z for c in clouds]),
+        # A zero-point cloud contributes no points, so its CRS does not take part either (matching the attribute
+        # scoping below): resolve across the clouds that actually carry points, or None when none do.
+        "crs": _resolve_crs(carrying),
+    }
+
+    for name in _ATTRIBUTES:
+        arrays = [getattr(c, name) for c in clouds]
+        # A zero-point cloud (e.g. one filtered to empty) contributes no rows, so it neither has nor needs the
+        # attribute: judge presence only among the clouds that actually carry points. Its size-0 array still
+        # concatenates harmlessly when the attribute is kept.
+        present = [values.size > 0 for values, count in zip(arrays, point_counts, strict=True) if count > 0]
+        if present and all(present):
+            merged[name] = np.concatenate(arrays)
+        elif any(present):
+            raise ValueError(
+                f"cannot merge: {name!r} is present on some clouds but not others; "
+                "give every cloud the dimension, or none"
+            )
+    return merged
+
+
+def _resolve_crs(clouds: Sequence[PointCloud]) -> CRS | None:
+    """Return the one CRS the clouds share, or raise when they disagree.
+
+    ``None`` (no known SRS) is treated as a distinct value, so merging a cloud that has a CRS with one that does
+    not is a conflict rather than a silent guess. An empty sequence (e.g. only zero-point clouds) resolves to
+    ``None``.
+    """
+    distinct: list[CRS | None] = []
+    for crs in (c.crs for c in clouds):
+        if not any(_crs_equal(crs, seen) for seen in distinct):
+            distinct.append(crs)
+    if len(distinct) > 1:
+        shown = ", ".join("None" if c is None else c.to_string() for c in distinct)
+        raise ValueError(f"cannot merge clouds with conflicting CRSs: {{{shown}}}")
+    return distinct[0] if distinct else None
+
+
+def _crs_equal(a: CRS | None, b: CRS | None) -> bool:
+    """Whether two CRSs are the same, counting ``None`` as equal only to ``None``."""
+    if a is None or b is None:
+        return a is None and b is None
+    return a == b
