@@ -352,13 +352,63 @@ class TestToCrs:
         assert cloud.classification[0] == 2, "mutating the result's attributes must not reach the source"
 
     def test_one_out_of_domain_point_aborts_the_whole_batch(self):
-        """errcheck is all-or-nothing: a single bad point raises and no partial result is returned (M1)."""
+        """on_invalid='raise' (the default) is all-or-nothing: one bad point raises, no partial result (M1)."""
         import pyproj
 
         cloud = PointCloud(x=np.array([3.0, 200.0]), y=np.array([52.0, 95.0]), z=np.zeros(2), crs="EPSG:4326")
 
         with pytest.raises(pyproj.exceptions.ProjError):
             cloud.to_crs("EPSG:32601")
+
+    def test_on_invalid_mask_sets_unreprojectable_points_to_nan(self):
+        """on_invalid='mask' keeps the count and alignment, NaN-ing only the points that fail to reproject."""
+        cloud = PointCloud(
+            x=np.array([3.0, 200.0]),
+            y=np.array([52.0, 95.0]),
+            z=np.array([1.0, 2.0]),
+            classification=np.array([2, 5], dtype=np.uint8),
+            crs="EPSG:4326",
+        )
+
+        out = cloud.to_crs("EPSG:32601", on_invalid="mask")
+
+        assert len(out) == 2, "mask preserves the point count"
+        assert np.isfinite(out.x[0]) and np.isfinite(out.y[0]), "the in-domain point is kept"
+        assert np.isnan(out.x[1]) and np.isnan(out.y[1]) and np.isnan(out.z[1]), "the bad point is NaN in x/y/z"
+        assert out.classification.tolist() == [2, 5], "attributes keep their length and alignment under mask"
+
+    def test_on_invalid_drop_removes_unreprojectable_points_and_their_attributes(self):
+        """on_invalid='drop' removes the failing points and the matching attribute rows, keeping alignment."""
+        cloud = PointCloud(
+            x=np.array([3.0, 200.0]),
+            y=np.array([52.0, 95.0]),
+            z=np.array([1.0, 2.0]),
+            classification=np.array([2, 5], dtype=np.uint8),
+            crs="EPSG:4326",
+        )
+
+        out = cloud.to_crs("EPSG:32601", on_invalid="drop")
+
+        assert len(out) == 1, "the single out-of-domain point is dropped"
+        assert np.isfinite(out.x[0]) and np.isfinite(out.y[0]), "the surviving point is the in-domain one"
+        assert out.classification.tolist() == [2], "the dropped point's attribute row goes with it"
+
+    def test_on_invalid_masks_on_the_vertical_path_too(self):
+        """on_invalid='mask' also gates on z along the vertical path: a bad point is NaN in x/y/z."""
+        cloud = PointCloud(x=np.array([5.0, 200.0]), y=np.array([52.0, 95.0]), z=np.array([0.0, 0.0]), crs="EPSG:4979")
+
+        out = cloud.to_crs("EPSG:4978", vertical=True, on_invalid="mask")
+
+        assert len(out) == 2, "mask preserves the count on the vertical path"
+        assert np.isfinite(out.x[0]) and np.isfinite(out.z[0]), "the in-domain point keeps finite x and z"
+        assert np.isnan(out.x[1]) and np.isnan(out.z[1]), "the bad point is NaN across x and z"
+
+    def test_on_invalid_rejects_an_unknown_value(self):
+        """An unrecognised on_invalid value is refused up front, before any transform runs."""
+        cloud = PointCloud(x=np.array([3.0]), y=np.array([52.0]), z=np.zeros(1), crs="EPSG:4326")
+
+        with pytest.raises(ValueError, match="on_invalid"):
+            cloud.to_crs("EPSG:32601", on_invalid="skip")
 
     def test_reprojects_an_empty_cloud(self):
         """A zero-point cloud reprojects to a zero-point cloud in the target CRS, with nothing to transform."""
