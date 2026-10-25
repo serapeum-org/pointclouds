@@ -26,6 +26,12 @@ COPC is a random-access format - and it stays the caller's to close.
 **EPT is not implemented here yet.** An Entwine tileset is a directory of files behind an ``ept.json`` rather
 than a single indexed file, and ``laspy`` has no reader for it, so it needs its own traversal and fetch path -
 the second half of the issue this module closes the first half of.
+
+**A corrupt octree reads short, silently.** laspy skips hierarchy entries it cannot parse, so a truncated or
+partially-transferred COPC - one whose hierarchy EVLR is damaged but whose header still parses - reads back as a
+smaller, plausible-looking cloud rather than raising. There is no integrity check here that compares the summed
+hierarchy point counts against the header's count; a caller that needs that guarantee should verify the
+transfer out of band.
 """
 
 from __future__ import annotations

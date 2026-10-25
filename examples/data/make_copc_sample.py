@@ -52,13 +52,14 @@ from pyproj import CRS
 SIDE = 40
 #: Every n-th point goes in the root node; the rest are pushed down to level 1.
 ROOT_STRIDE = 16
-#: COPC requires point format 6, 7 or 8 (the LAS 1.4 formats). 6 is the smallest that carries what we need.
+#: COPC requires point format 6, 7 or 8 (the three LAS 1.4 formats COPC permits; LAS 1.4 itself defines 6-10).
+#: 6 is the smallest that carries what we need.
 POINT_FORMAT = 6
 #: Pinned so re-running the script produces a byte-identical file.
 CREATION_DATE = date(2026, 10, 25)
 #: Size of an EVLR header, which sits between ``start_of_first_evlr`` and the hierarchy entries themselves.
 EVLR_HEADER_SIZE = 60
-#: A ``copc`` info VLR is exactly this long: 8 doubles, 2 uint64s, then reserved bytes.
+#: A ``copc`` info VLR is exactly this long: 7 doubles, 2 uint64s (72 bytes), then 88 reserved bytes.
 COPC_INFO_SIZE = 160
 
 
