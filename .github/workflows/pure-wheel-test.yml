@@ -1,0 +1,169 @@
+name: Pure Wheel - Build & Test
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch / ref to build and test (defaults to the ref selected in the UI)"
+        required: false
+        default: ""
+        type: string
+  workflow_call:
+    inputs:
+      branch:
+        description: "Ref to build and test (passed by the calling workflow)"
+        required: false
+        default: ""
+        type: string
+
+jobs:
+  build-wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch || github.ref }}
+
+      - name: Set up Pixi
+        uses: serapeum-org/github-actions/actions/python-setup/pixi@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # pixi/v1.2.1
+        with:
+          environments: dev
+          activate-environment: dev
+          cache: true
+          version: v0.73.0
+
+      - name: Build wheel
+        run: pixi run -e dev python -m build --wheel --outdir dist/
+
+      - name: Verify package layout in wheel
+        # This package ships no data files, so the check is that the package and
+        # its three subpackages plus the pyramids-boundary module are present: a
+        # src-layout or packaging regression that dropped them would still build
+        # an installable but empty wheel.
+        run: |
+          LISTING=$(pixi run -e dev python -m zipfile -l dist/*.whl)
+          echo "$LISTING" | grep "pointclouds/__init__.py"
+          echo "$LISTING" | grep "pointclouds/io/__init__.py"
+          echo "$LISTING" | grep "pointclouds/ops/__init__.py"
+          echo "$LISTING" | grep "pointclouds/classify/__init__.py"
+          echo "$LISTING" | grep "pointclouds/convert.py"
+
+      - name: Upload wheel artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: wheel
+          path: dist/*.whl
+
+  test-wheel-core:
+    needs: build-wheel
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch || github.ref }}
+
+      - name: Download wheel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheel
+          path: dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install wheel (no extras)
+        # --only-binary=:all: is the whole point of a pure-wheel test: every core
+        # runtime dependency (numpy, laspy[lazrs], pyproj, scipy) must install
+        # from a published wheel on this OS / Python, never build from an sdist.
+        # No extras, so no pyramids and no GDAL come along.
+        shell: bash
+        run: |
+          WHEEL=$(ls dist/*.whl)
+          pip install "${WHEEL}" --only-binary=:all:
+
+      - name: Verify the core imports with no pyramids and no GDAL
+        # The package's defining contract (ADR-0001): `import pointclouds` must
+        # succeed on the bare install, pulling in neither pyramids nor osgeo.
+        # Checked here against the INSTALLED wheel, not the source tree.
+        run: |
+          python -c "import sys, pointclouds; print(pointclouds.__version__); assert 'pyramids' not in sys.modules and 'osgeo' not in sys.modules, 'core import pulled in the GIS stack'"
+
+      - name: Install test runner
+        run: "pip install pytest --only-binary=:all:"
+
+      - name: Run core tests (no extras)
+        # -o pythonpath= clears the `pythonpath = ["src"]` setting so the tests
+        # import the INSTALLED wheel, not the source tree. The gis/cloud tests
+        # need extras that are not installed here, so they are deselected.
+        run: pytest -vvv -o pythonpath= -m "not gis and not cloud" tests/
+
+  test-wheel-extras:
+    needs: build-wheel
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.12"]
+        extra:
+          - name: gis
+            marker: gis
+            verify: "import pointclouds; from pointclouds.convert import require_pyramids; require_pyramids()"
+          - name: cloud
+            marker: cloud
+            verify: "import pointclouds; import fsspec, s3fs"
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.branch || github.ref }}
+
+      - name: Download wheel artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: wheel
+          path: dist/
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install wheel with only [${{ matrix.extra.name }}] extra
+        shell: bash
+        run: |
+          WHEEL=$(ls dist/*.whl)
+          pip install "${WHEEL}[${{ matrix.extra.name }}]"
+
+      - name: Verify the [${{ matrix.extra.name }}] extra resolves at import
+        # gis reaches pyramids only through the guarded require_pyramids boundary,
+        # which must return the classes once the extra is installed; cloud must
+        # make fsspec and s3fs importable. With the extra absent these raise, so
+        # a clean run here is the gate working.
+        run: python -c "${{ matrix.extra.verify }}"
+
+      - name: Install test runner
+        run: pip install pytest
+
+      - name: Run the [${{ matrix.extra.name }}] tests against the installed wheel
+        # -o pythonpath= imports the wheel, not src/. Exit 5 (no tests collected)
+        # is tolerated: the cloud windowed-read tests land with T-16, so until
+        # then `-m cloud` selects nothing and that is not a failure.
+        shell: bash
+        run: pytest -vvv -o pythonpath= -m "${{ matrix.extra.marker }}" tests/ || [ $? -eq 5 ]

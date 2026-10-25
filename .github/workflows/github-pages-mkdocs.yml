@@ -27,17 +27,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      # serapeum-org/github-actions is a monorepo: one commit carries the release tag
-      # for every action in it, so 38c11108 is the dereferenced commit for pixi/v1.2.1,
-      # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
-      # different actions pinned to one SHA reads like a copy-paste error and is not;
-      # verify with
+      # serapeum-org/github-actions is a monorepo: one commit carries the release tag for
+      # every action in it, so 38c11108 is the dereferenced commit for mkdocs/v1.3.1,
+      # github-release/v1.5.0, pypi-release/v1.0.3 and pixi/v1.2.1 alike. Three different
+      # actions pinned to one SHA reads like a copy-paste error and is not; verify with
       #   git ls-remote --tags https://github.com/serapeum-org/github-actions
       - uses: serapeum-org/github-actions/actions/mkdocs-deploy@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # mkdocs/v1.3.1
         with:
           trigger: 'pull_request'
           package-manager: 'pixi'
-          package-manager-version: 'v0.73.0'
           install-groups: 'docs'
           deploy-token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
 
@@ -52,7 +50,6 @@ jobs:
       with:
         trigger: 'main'
         package-manager: 'pixi'
-        package-manager-version: 'v0.73.0'
         install-groups: 'docs'
         deploy-token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
 
@@ -70,9 +67,12 @@ jobs:
     - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       with:
         fetch-depth: 0
-        # Pin to the immutable SHA recorded on the originating run, not the
-        # mutable `head_branch` label (CWE-829: actions/untrusted-checkout).
-        ref: ${{ github.event.workflow_run.head_sha || github.ref }}
+        # head_branch (not head_sha): github-release pushes the version-bump +
+        # pixi.lock commits AFTER the workflow_run head_sha is captured, so the
+        # branch tip carries the released version while head_sha would check out
+        # the pre-bump tree. The fork guard in `if:` above keeps this from
+        # checking out untrusted code. Same choice as pypi-release.yml.
+        ref: ${{ github.event.workflow_run.head_branch || github.ref }}
 
     - name: Extract version from pyproject.toml
       id: version
@@ -84,8 +84,7 @@ jobs:
       with:
         trigger: 'release'
         package-manager: 'pixi'
-        package-manager-version: 'v0.73.0'
-        install-groups: 'docs'
+        install-groups: "docs"
         deploy-token: ${{ secrets.ACTIONS_DEPLOY_TOKEN }}
         release-tag: ${{ github.event.release.tag_name || steps.version.outputs.tag }}
         mike-alias: 'latest'
