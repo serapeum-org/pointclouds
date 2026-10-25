@@ -71,9 +71,17 @@ class FileObject(Protocol):
     documents as sufficient.
     """
 
-    def read(self, size: int = ..., /) -> bytes: ...
-    def seek(self, offset: int, whence: int = ..., /) -> int: ...
-    def tell(self) -> int: ...
+    def read(self, size: int = ..., /) -> bytes:
+        """Read up to ``size`` bytes (all remaining when ``size`` is negative or omitted)."""
+        ...
+
+    def seek(self, offset: int, whence: int = ..., /) -> int:
+        """Move to byte ``offset`` relative to ``whence`` and return the new absolute position."""
+        ...
+
+    def tell(self) -> int:
+        """Return the current absolute byte position."""
+        ...
 
 
 #: What a source may be: a path, or an already-open file object (an ``fsspec`` handle, a ``BytesIO``, ...).
