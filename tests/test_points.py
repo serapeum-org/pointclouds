@@ -187,6 +187,103 @@ class TestToArray:
         assert cloud.to_array(("X", "Y", "Z")).shape == (EXPECTED_COUNT, 3)
 
 
+class TestToCrs:
+    """Reprojecting a cloud with pyproj (no GDAL, no pyramids)."""
+
+    def test_sets_the_target_crs_and_keeps_the_count(self):
+        """The returned cloud is in the target CRS and holds the same number of points."""
+        cloud = PointCloud(
+            x=np.array([155000.0, 155038.0]), y=np.array([463000.0, 463038.0]), z=np.zeros(2), crs="EPSG:28992"
+        )
+
+        utm = cloud.to_crs("EPSG:32631")
+
+        assert utm.crs.to_epsg() == 32631
+        assert len(utm) == 2
+        assert cloud.crs.to_epsg() == 28992, "the source cloud is left untouched"
+
+    def test_axis_order_is_xy_even_for_a_latlon_crs(self):
+        """EPSG:4326's registry order is lat/lon, yet always_xy puts longitude in x and latitude in y."""
+        # 155000, 463000 in RD New is the Amersfoort datum point: ~5.39 E, ~52.16 N.
+        cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1), crs="EPSG:28992")
+
+        wgs = cloud.to_crs("EPSG:4326")
+
+        assert wgs.x[0] == pytest.approx(5.387, abs=0.01), "x must be longitude, not latitude"
+        assert wgs.y[0] == pytest.approx(52.155, abs=0.01), "y must be latitude"
+
+    def test_a_round_trip_recovers_the_source_coordinates(self):
+        """28992 -> 4326 -> 28992 returns the original x/y within floating-point tolerance."""
+        x0 = np.array([155000.0, 160000.0, 180000.0])
+        y0 = np.array([463000.0, 400000.0, 450000.0])
+        cloud = PointCloud(x=x0, y=y0, z=np.zeros(3), crs="EPSG:28992")
+
+        back = cloud.to_crs("EPSG:4326").to_crs("EPSG:28992")
+
+        assert back.x == pytest.approx(x0, abs=1e-3)
+        assert back.y == pytest.approx(y0, abs=1e-3)
+
+    def test_attributes_are_carried_over_aligned(self):
+        """Attribute arrays survive the transform unchanged and stay aligned with the coordinates."""
+        cloud = PointCloud(
+            x=np.array([155000.0, 155038.0]),
+            y=np.array([463000.0, 463038.0]),
+            z=np.array([1.0, 2.0]),
+            classification=np.array([2, 5], dtype=np.uint8),
+            crs="EPSG:28992",
+        )
+
+        out = cloud.to_crs("EPSG:32631")
+
+        assert out.classification.tolist() == [2, 5]
+        assert out.classification.shape == out.x.shape
+
+    def test_a_cloud_without_a_crs_refuses_to_reproject(self, tiny_cloud):
+        """With crs=None there is no source to transform from, so to_crs raises rather than guessing."""
+        with pytest.raises(ValueError, match="crs is None"):
+            tiny_cloud.to_crs("EPSG:4326")
+
+    def test_horizontal_only_leaves_z_in_the_source_datum(self):
+        """The default transform touches x/y only; z is carried over unchanged."""
+        z0 = np.array([10.0, 20.0, 30.0])
+        cloud = PointCloud(
+            x=np.array([155000.0, 160000.0, 180000.0]),
+            y=np.array([463000.0, 400000.0, 450000.0]),
+            z=z0,
+            crs="EPSG:28992",
+        )
+
+        out = cloud.to_crs("EPSG:32631")
+
+        assert np.array_equal(out.z, z0)
+
+    def test_vertical_shift_is_refused_without_a_vertical_crs(self):
+        """vertical=True on a 2-D -> 2-D transform raises rather than silently leaving z in the source datum."""
+        cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1), crs="EPSG:28992")
+
+        with pytest.raises(ValueError, match="vertical"):
+            cloud.to_crs("EPSG:32631", vertical=True)
+
+    def test_vertical_shift_transforms_z_with_a_3d_crs(self):
+        """vertical=True on a 3-D CRS on both sides actually moves z (EPSG:4979 geographic -> EPSG:4978 ECEF)."""
+        cloud = PointCloud(x=np.array([5.0]), y=np.array([52.0]), z=np.array([0.0]), crs="EPSG:4979")
+
+        ecef = cloud.to_crs("EPSG:4978", vertical=True)
+
+        assert ecef.crs.to_epsg() == 4978
+        assert np.isfinite(ecef.z[0])
+        assert abs(ecef.z[0]) > 1.0, "ellipsoidal height 0 maps to a large ECEF Z component"
+
+    def test_it_loads_a_lazy_cloud(self, sample_laz):
+        """to_crs is a record operation, so it loads a lazy cloud before transforming."""
+        cloud = PointCloud.read_file(sample_laz)
+
+        out = cloud.to_crs("EPSG:4326")
+
+        assert len(out) == EXPECTED_COUNT
+        assert out.crs.to_epsg() == 4326
+
+
 def test_the_phase_0_vertical_slice(sample_laz):
     """The §11.6 slice verbatim: it defines "scaffold done" and must run on the core install.
 

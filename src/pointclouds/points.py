@@ -18,7 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
-from pyproj import CRS
+from pyproj import CRS, Transformer
 
 from pointclouds.io import las as _las
 
@@ -253,6 +253,67 @@ class PointCloud:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
         return np.column_stack(cols)
 
+    def to_crs(self, crs: CRS | str, *, vertical: bool = False) -> PointCloud:
+        """Reproject the cloud into another CRS with pyproj, returning a new cloud.
+
+        The transform is built with ``Transformer.from_crs(..., always_xy=True)``, so coordinates are always
+        read and written in ``(x, y)`` / easting-northing / longitude-latitude order regardless of the axis
+        order the EPSG registry declares for either CRS (e.g. EPSG:4326's registry order is lat/lon, yet this
+        returns lon in ``x`` and lat in ``y``).
+
+        **Vertical datum.** By default (``vertical=False``) only x and y are transformed; z is carried over
+        unchanged, still in the source vertical datum. This is the right choice when the target is a 2-D
+        horizontal CRS - there is no vertical transformation to apply - but it means a 3-D reprojection is never
+        done implicitly. To shift z as well, pass ``vertical=True``; this requires a compound or 3-D CRS on both
+        sides (one that carries a vertical axis) and raises otherwise, so z is never silently left in the source
+        datum when a vertical transform was asked for but is impossible.
+
+        Attribute arrays (intensity, classification, return number) are carried over unchanged and stay aligned
+        with the reprojected coordinates.
+
+        Args:
+            crs: the target CRS, as anything :class:`pyproj.CRS` accepts (an EPSG string, WKT, a ``CRS``).
+            vertical: when ``True``, transform z as well as x/y; requires a vertical/compound CRS on both sides.
+
+        Returns:
+            A new, loaded :class:`PointCloud` in ``crs``, with x/y (and z when ``vertical``) transformed.
+
+        Raises:
+            ValueError: when :attr:`crs` is ``None`` (no source CRS to transform from), or when ``vertical`` is
+                ``True`` but the source or target CRS carries no vertical axis.
+
+        Examples:
+            >>> import numpy as np
+            >>> cloud = PointCloud(x=np.array([155000.0]), y=np.array([463000.0]), z=np.zeros(1), crs="EPSG:28992")
+            >>> utm = cloud.to_crs("EPSG:32631")
+            >>> utm.crs.to_epsg()
+            32631
+        """
+        if self._crs is None:
+            raise ValueError("cannot reproject a cloud whose crs is None; set a source CRS first")
+        target = CRS.from_user_input(crs)
+        if vertical and not (_has_vertical_axis(self._crs) and _has_vertical_axis(target)):
+            raise ValueError(
+                "vertical=True needs a compound or 3-D CRS (one with a vertical axis) on both sides; "
+                f"got source {self._crs.to_string()!r} and target {target.to_string()!r}. Refusing rather "
+                "than leaving z in the source datum."
+            )
+        transformer = Transformer.from_crs(self._crs, target, always_xy=True)
+        if vertical:
+            x, y, z = transformer.transform(self.x, self.y, self.z)
+        else:
+            x, y = transformer.transform(self.x, self.y)
+            z = self.z
+        return PointCloud(
+            x=x,
+            y=y,
+            z=z,
+            intensity=self.intensity,
+            classification=self.classification,
+            return_number=self.return_number,
+            crs=target,
+        )
+
     def __len__(self) -> int:
         """Return how many points are in memory, loading the records first if needed.
 
@@ -268,6 +329,21 @@ class PointCloud:
 
 
 _EMPTY_F8 = np.empty(0, dtype=np.float64)
+
+
+def _has_vertical_axis(crs: CRS) -> bool:
+    """Whether ``crs`` carries height, so a vertical datum shift is meaningful.
+
+    True for a compound CRS (horizontal + vertical), a 3-D CRS (three axes), or a bare vertical CRS; false for a
+    plain 2-D horizontal CRS, where there is no z to transform.
+
+    Args:
+        crs: the CRS to inspect.
+
+    Returns:
+        ``True`` when the CRS has a vertical component.
+    """
+    return crs.is_compound or crs.is_vertical or len(crs.axis_info) >= 3
 
 
 def _as_attribute(values: np.ndarray | None, dtype: type) -> np.ndarray:
