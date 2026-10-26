@@ -104,7 +104,7 @@ jobs:
           python -c "import sys, pointclouds; print(pointclouds.__version__); assert 'pyramids' not in sys.modules and 'osgeo' not in sys.modules, 'core import pulled in the GIS stack'"
 
       - name: Install test runner
-        run: "pip install pytest --only-binary=:all:"
+        run: "pip install pytest pytest-env pytest-mock pytest-timeout --only-binary=:all:"
 
       - name: Run core tests (no extras)
         # -o pythonpath= clears the `pythonpath = ["src"]` setting so the tests
@@ -159,7 +159,7 @@ jobs:
         run: python -c "${{ matrix.extra.verify }}"
 
       - name: Install test runner
-        run: pip install pytest
+        run: pip install pytest pytest-env pytest-mock pytest-timeout
 
       - name: Run the [${{ matrix.extra.name }}] tests against the installed wheel
         # -o pythonpath= imports the wheel, not src/. Exit 5 (no tests collected)
