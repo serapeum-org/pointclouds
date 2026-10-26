@@ -9,20 +9,32 @@ on:
     branches: [main]
   pull_request:
 
+# Cancel a superseded run: a new push to the same ref (a PR branch, or main)
+# cancels the previous in-progress run instead of letting both compete for the
+# hosted-runner pool. Keyed on github.ref, so a PR never cancels a main run and
+# vice versa — only a newer commit on the same ref supersedes the older one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # The GDAL-free core. None of the pyXXX environments carries the `gis` or
-  # `cloud` feature, so this matrix installs no pyramids and no GDAL at all -
-  # the `main` task additionally deselects those markers, and an accidental
-  # import would fail here rather than pass on a machine that happens to have
-  # the stack. This is the matrix that matters: the core is pure PyPI wheels,
-  # so it is expected to pass on every OS and every supported interpreter.
-  core:
+  main-package:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
         environment: [py311, py312, py313, py314]
+        # The full environment carries the optional stacks (pyramids-core via the
+        # gis extra, plus fsspec and s3fs via cloud). It is OS-independent, so it
+        # runs as a single extra job on ubuntu rather than across every OS -- and
+        # it is the only environment where the gis/cloud-marked tests run, so it
+        # uses the `test-all` task (`main` deselects those markers). full is
+        # pinned to 3.12, so it cannot join the shared matrix that includes py311.
+        include:
+          - os: ubuntu-latest
+            environment: full
+            task: test-all
 
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -30,69 +42,37 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Python
-        # serapeum-org/github-actions is a monorepo: one commit carries the release tag
-        # for every action in it, so 38c11108 is the dereferenced commit for pixi/v1.2.1,
-        # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
-        # different actions pinned to one SHA reads like a copy-paste error and is not;
-        # verify with
+        # serapeum-org/github-actions is a monorepo: one commit carries the release tag for
+        # every action in it, so 38c11108 is the dereferenced commit for mkdocs/v1.3.1,
+        # github-release/v1.5.0, pypi-release/v1.0.3 and pixi/v1.2.1 alike. Four different
+        # actions pinned to one SHA reads like a copy-paste error and is not; verify with
         #   git ls-remote --tags https://github.com/serapeum-org/github-actions
         uses: serapeum-org/github-actions/actions/python-setup/pixi@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # pixi/v1.2.1
         with:
           environments: ${{ matrix.environment }}
           activate-environment: ${{ matrix.environment }}
           cache: true
-          # Pin the same pixi that writes pixi.lock locally: the lock is format
-          # v7, which older pixi refuses to read. Bump this, github-release.yml
-          # and the local toolchain together when the format moves again.
+          # pixi.lock is lock-file format v7, which pixi 0.65 (the version the
+          # action pinned before it exposed this input) refuses to read. Pin the
+          # same pixi that writes the lock so CI and local stay in lockstep —
+          # bump both together when the lock format moves again.
           version: v0.73.0
 
-      - name: Run core tests
-        run: pixi run -e ${{ matrix.environment }} main
+      - name: Run main tests
+        # Every matrix leg runs `main` (the GDAL-free core suite); the `full`
+        # include overrides task=test-all so the gis/cloud tests, which `main`
+        # deselects, actually execute in the one environment that carries them.
+        run: |
+          pixi run -e ${{ matrix.environment }} ${{ matrix.task || 'main' }}
 
-      - name: Upload coverage reports to Codecov
+      - name: Upload coverage reports to Codecov with GitHub Action
         uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
 
-  # The one environment carrying the optional stacks, and so the only place the
-  # `gis`-marked tests run at all: `tests/test_convert.py` exercises the
-  # `require_pyramids` boundary with pyramids actually installed, which the core
-  # matrix cannot do. Everywhere else those tests are deselected by the `main`
-  # task's `-m "not gis and not cloud"`, or skipped by the module's
-  # `importorskip`. The `to_dataset` / `to_feature_collection` converters land
-  # with T-12 and will be covered here too.
-  #
-  # One runner is enough - the extras carry their own platform matrix upstream,
-  # and pyramids-gis publishes cp311-cp314 wheels only.
-  full:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: serapeum-org/github-actions/actions/python-setup/pixi@38c111084f99d5ff5f4a1e63bedce48fe33a10c0 # pixi/v1.2.1
-        with:
-          environments: full
-          activate-environment: full
-          cache: true
-          version: v0.73.0
-
-      - name: Run the whole suite
-        run: pixi run -e full test-all
-
-      - name: Upload coverage reports to Codecov
-        uses: codecov/codecov-action@0fb7174895f61a3b6b78fc075e0cd60383518dac # v5.5.5
-
-      - name: Test Jupyter notebooks
+      - name: test Jupyter notebooks
         shell: bash
-        # docs/examples is empty until the first tutorial notebook lands, and
-        # pytest exits 5 (no tests collected) or 4 (usage error: file or
-        # directory not found) in that state. Treat both as success rather than
-        # gating the suite on a directory that is not populated yet.
         run: |
           set +e
-          pixi run -e full notebooks
+          pixi run -e ${{ matrix.environment }} notebooks
           rc=$?
           if [ $rc -eq 4 ] || [ $rc -eq 5 ]; then exit 0; fi
           exit $rc

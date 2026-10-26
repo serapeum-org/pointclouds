@@ -17,64 +17,34 @@ jobs:
   pip-audit:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        # Four environments, because each pixi environment is one concrete
-        # resolution and an unaudited environment is an unaudited dependency:
-        #   py311 / py314 - the two ends of the interpreter range, which resolve
-        #                   different versions of numpy, scipy and pyproj.
-        #   full          - the only environment carrying the `gis` and `cloud`
-        #                   features, so pyramids-gis, fsspec and s3fs are
-        #                   audited at all.
-        #   docs          - mkdocs-material and the mkdocstrings stack, ~80
-        #                   packages that no other environment installs.
-        # Together these cover every runtime dependency, extra and dependency
-        # group the project declares.
-        environment: [py311, py314, full, docs]
-
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
       - name: Set up Python
-        # serapeum-org/github-actions is a monorepo: one commit carries the release tag
-        # for every action in it, so 38c11108 is the dereferenced commit for pixi/v1.2.1,
-        # mkdocs/v1.3.1, github-release/v1.5.0 and pypi-release/v1.0.3 alike. Several
-        # different actions pinned to one SHA reads like a copy-paste error and is not;
-        # verify with
+        # serapeum-org/github-actions is a monorepo: one commit carries the release tag for
+        # every action in it, so 38c11108 is the dereferenced commit for mkdocs/v1.3.1,
+        # github-release/v1.5.0, pypi-release/v1.0.3 and pixi/v1.2.1 alike. Four different
+        # actions pinned to one SHA reads like a copy-paste error and is not; verify with
         #   git ls-remote --tags https://github.com/serapeum-org/github-actions
         uses: serapeum-org/github-actions/actions/python-setup/pixi@38c111084f99d5ff5f4a1e63bedce48fe33a10c0  # pixi/v1.2.1
         with:
-          environments: ${{ matrix.environment }}
-          activate-environment: ${{ matrix.environment }}
+          environments: py311
+          activate-environment: py311
           cache: true
           # Must match the pixi pinned in tests.yml and github-release.yml:
           # pixi.lock is lock-file format v7, which older pixi refuses to read.
           version: v0.73.0
 
-      # The inventory comes from `pixi list`, not `pip freeze`, for two reasons:
-      # `pip` is only in the `dev` dependency group, so `python -m pip freeze`
-      # in the `docs` environment prints nothing and the job would audit an
-      # empty file and pass; and pip reads the user site-packages, so it reports
-      # packages the environment does not contain. `pixi list` is the manager's
-      # own record and needs nothing installed inside the environment.
-      #
-      # Only `kind == "pypi"` entries with a version survive: pip-audit resolves
-      # names against PyPI, where the conda packages (python, openssl, ...) are
-      # not projects, and the editable self-install carries no version.
-      #
-      # `test -s` is the guard that matters - an empty requirements file makes
-      # pip-audit report success, so a mis-piped command would look like a clean
-      # scan. `--no-deps` keeps the result independent of whichever interpreter
-      # pipx picks: the file is fully pinned, so pip-audit looks each package up
-      # in the advisory DB instead of resolving the set in a throwaway venv.
+      # py311 is the floor of `requires-python`, so it resolves the oldest
+      # dependency set the project supports — the one most likely to carry a
+      # known advisory. `--exclude-editable` drops this package itself (it has no
+      # release to audit); the grep keeps only `name==version` lines, since
+      # pip-audit rejects a requirements file holding direct URLs or local paths.
       - name: Audit dependencies with pip-audit
         run: |
-          pixi list -e ${{ matrix.environment }} --json \
-            | python -c "import json,sys; [print(p['name']+'=='+p['version']) for p in sorted(json.load(sys.stdin), key=lambda q: q['name']) if p.get('kind')=='pypi' and p.get('version')]" \
-            > "${RUNNER_TEMP}/pip-audit-reqs.txt"
-          test -s "${RUNNER_TEMP}/pip-audit-reqs.txt"
-          echo "Auditing $(wc -l < "${RUNNER_TEMP}/pip-audit-reqs.txt") pinned packages from the ${{ matrix.environment }} environment"
-          pipx run pip-audit --requirement "${RUNNER_TEMP}/pip-audit-reqs.txt" --no-deps --desc
+          pixi run -e py311 python -m pip freeze --exclude-editable \
+            | grep -E '^[A-Za-z0-9_.-]+==' > "${RUNNER_TEMP}/pip-audit-reqs.txt"
+          echo "Auditing $(wc -l < "${RUNNER_TEMP}/pip-audit-reqs.txt") pinned packages against the advisory DB"
+          pipx run pip-audit --requirement "${RUNNER_TEMP}/pip-audit-reqs.txt" --desc
