@@ -1,6 +1,6 @@
-## 0.1.0 (2026-10-26)
+# Changelog
 
-### BREAKING CHANGE
+## 0.1.0 (2026-10-26)
 
 - PointCloud is no longer a dataclass, so it no longer
 has a generated __eq__ and two clouds compare by identity. The
@@ -13,7 +13,3 @@ on any cloud with array fields, so no working comparison is lost.
 - **ops**: add filter, decimate, clip, merge and to_grid to PointCloud (#12)
 - **points**: add to_crs for pyproj reprojection (#11)
 - **io**: read LAS/LAZ header-first into PointCloud (#8)
-
-### Fix
-
-- **release**: disable incremental changelog for the first release
