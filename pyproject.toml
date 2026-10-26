@@ -123,7 +123,11 @@ name = "cz_conventional_commits"
 version_provider = "pep621"
 tag_format = "$version"
 changelog_file = "docs/change-log.md"
-changelog_incremental = true
+# Incremental changelog needs a prior tag to diff against, which a first
+# release does not have (commitizen errors "No tag found to do an incremental
+# changelog", exit 16). The release action regenerates the full changelog each
+# run, so keep this off and let it rebuild from history.
+changelog_incremental = false
 update_changelog_on_bump = false
 major_version_zero = true       # while < 1.0
 style = [
