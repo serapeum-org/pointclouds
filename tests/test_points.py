@@ -510,19 +510,25 @@ class TestReadWindowDimensions:
         assert cloud.z.shape == (121,)
         assert cloud.classification.size == 0
 
-    def test_canonical_dimensions_match_the_constructor(self):
-        """`cls(crs=crs, **arrays)` depends on CANONICAL's keys being exactly the ctor's point parameters.
+    def test_the_constructor_accepts_every_canonical_attribute_by_keyword(self):
+        """`cls(crs=crs, **arrays)` relies on the constructor taking each canonical dimension as a keyword.
 
-        If either side moves, the splat breaks at a call site; this makes it fail loudly here instead.
+        The constructor captures ``**attributes``, so every canonical non-coordinate dimension round-trips
+        through it onto :attr:`PointCloud.attributes`; if a name stopped being accepted the splat would break
+        at a call site, and this fails loudly here instead.
         """
-        import inspect
-
         from pointclouds.io import _records
 
-        params = set(inspect.signature(PointCloud.__init__).parameters) - {"self", "crs"}
-        assert set(_records.CANONICAL) == params, (
-            f"CANONICAL {sorted(_records.CANONICAL)} drifted from ctor params {sorted(params)}"
+        attrs = {
+            name: np.zeros(3, dtype=dtype) for name, dtype in _records.CANONICAL.items() if name not in ("x", "y", "z")
+        }
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3), **attrs)
+
+        assert set(cloud.attributes) == set(attrs), (
+            "every canonical attribute should round-trip through the constructor"
         )
+        assert cloud.gps_time.shape == (3,), "gps_time is exposed as a property"
+        assert cloud.red.shape == (3,), "red is exposed as a property"
 
 
 class TestReadFileWindowGuards:
@@ -550,3 +556,95 @@ class TestToArrayEmptyDimension:
 
         with pytest.raises(ValueError, match="intensity"):
             cloud.to_array(("X", "intensity"))
+
+
+class TestConstructorKeywordOnlyCrs:
+    """`crs` is keyword-only, so a stray positional attribute can't silently become the CRS (H1)."""
+
+    def test_a_positional_fourth_argument_is_refused(self):
+        """A 4th positional arg (the old `intensity` slot) raises TypeError instead of binding to crs.
+
+        Before this was keyword-only, PointCloud(x, y, z, intensity_array) bound the array to `crs` silently and
+        dropped the intensity; now it fails loudly.
+        """
+        with pytest.raises(TypeError):
+            PointCloud(np.zeros(3), np.zeros(3), np.zeros(3), np.ones(3, np.uint16))
+
+    def test_crs_still_works_by_keyword(self):
+        """Passing crs by keyword is unaffected."""
+        cloud = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), crs="EPSG:28992")
+
+        assert cloud.crs.to_epsg() == 28992
+
+
+class TestMergeWidenedAttributes:
+    """merge must carry the full attribute table and extras, not just the three legacy dims (R2-H1)."""
+
+    def test_merge_preserves_every_shared_attribute(self):
+        """Merging clouds that share gps_time / RGB / an extra keeps them all, concatenated in order."""
+        a = PointCloud(
+            x=np.zeros(2),
+            y=np.zeros(2),
+            z=np.zeros(2),
+            classification=np.array([2, 2], np.uint8),
+            gps_time=np.array([1.0, 2.0]),
+            red=np.array([10, 20], np.uint16),
+            amplitude=np.array([0.5, 0.6], np.float32),
+        )
+        b = PointCloud(
+            x=np.ones(1),
+            y=np.ones(1),
+            z=np.ones(1),
+            classification=np.array([5], np.uint8),
+            gps_time=np.array([3.0]),
+            red=np.array([30], np.uint16),
+            amplitude=np.array([0.7], np.float32),
+        )
+
+        merged = PointCloud.merge([a, b])
+
+        assert merged.gps_time.tolist() == [1.0, 2.0, 3.0]
+        assert merged.red.tolist() == [10, 20, 30]
+        assert merged.attributes["amplitude"] == pytest.approx([0.5, 0.6, 0.7])  # float32 extra
+        assert merged.attributes["amplitude"].dtype == np.float32
+        assert merged.classification.tolist() == [2, 2, 5]
+
+    def test_merge_still_rejects_a_dimension_present_on_only_some(self):
+        """The present-on-all-or-none rule still holds for the widened set."""
+        a = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), gps_time=np.array([1.0]))
+        b = PointCloud(x=np.ones(1), y=np.ones(1), z=np.ones(1))
+
+        with pytest.raises(ValueError, match="present on some"):
+            PointCloud.merge([a, b])
+
+
+class TestToArrayVectorDiagnostic:
+    """to_array distinguishes a present-but-non-1-D dimension from an absent one (R2-N1)."""
+
+    def test_a_vector_dimension_is_reported_as_non_scalar_not_absent(self):
+        """Stacking a present (N, k) extra fails with a 'not a single column' message, not 'carries none'."""
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3), rgb3=np.zeros((3, 3), dtype=np.uint8))
+
+        with pytest.raises(ValueError, match="not a single column|per-point scalar"):
+            cloud.to_array(("x", "rgb3"))
+
+    def test_an_absent_dimension_still_says_carries_none(self):
+        """A genuinely absent dimension keeps the 'carries none of them' wording."""
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3))
+
+        with pytest.raises(ValueError, match="carries none of them"):
+            cloud.to_array(("x", "intensity"))
+
+
+class TestMergeWithEmptyCloud:
+    """A zero-point cloud contributes no rows and does not dictate attribute presence (merge filler path)."""
+
+    def test_an_empty_cloud_is_a_noop_participant(self):
+        """Merging a populated cloud (with gps_time) and an empty one keeps gps_time, from the one that had it."""
+        full = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2), gps_time=np.array([1.0, 2.0]))
+        empty = PointCloud(x=np.empty(0), y=np.empty(0), z=np.empty(0))
+
+        merged = PointCloud.merge([full, empty])
+
+        assert len(merged) == 2
+        assert merged.gps_time.tolist() == [1.0, 2.0]

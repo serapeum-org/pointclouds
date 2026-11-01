@@ -16,7 +16,7 @@ import pytest
 from pyproj import CRS
 
 from pointclouds import PointCloud
-from pointclouds.io import copc, las
+from pointclouds.io import _records, copc, las
 
 #: The fixture is a 40 x 40 grid at 2 m spacing - see examples/data/make_copc_sample.py.
 EXPECTED_COUNT = 1600
@@ -165,8 +165,10 @@ class TestBoundingBoxWindow:
         """A window returns the same dimension set, dtypes and alignment as a whole-file read."""
         arrays = copc.read_window(sample_copc, bbox=CORNER_BBOX)
 
-        assert set(arrays) == {"x", "y", "z", "intensity", "classification", "return_number"}
-        assert all(values.shape == (CORNER_COUNT,) for values in arrays.values())
+        assert set(arrays) == set(_records.CANONICAL), "a window is keyed by every canonical dimension"
+        for name in ("x", "y", "z", "intensity", "classification", "return_number", "gps_time"):
+            assert arrays[name].shape == (CORNER_COUNT,), f"{name} should be full length on point format 6"
+        assert arrays["red"].size == 0, "point format 6 carries no RGB, so it is empty"
         assert arrays["x"].dtype == np.float64
         assert arrays["intensity"].dtype == np.uint16
         assert arrays["classification"].dtype == np.uint8
@@ -322,7 +324,7 @@ class TestRejections:
 
     def test_an_unknown_dimension_is_refused(self, sample_copc):
         """An unknown dimension fails loudly, listing what the engine does read."""
-        with pytest.raises(KeyError, match="unknown dimension"):
+        with pytest.raises(KeyError, match="unknown standard dimension"):
             copc.read_window(sample_copc, dimensions=("X", "nosuchdim"))
 
 

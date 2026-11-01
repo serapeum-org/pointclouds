@@ -17,17 +17,39 @@ from typing import Any, Protocol
 
 import numpy as np
 
-__all__ = ["CANONICAL", "clip_to_box", "declared_names", "extract", "resolve"]
+__all__ = [
+    "CANONICAL",
+    "clip_to_box",
+    "declared_names",
+    "extra_dimension_names",
+    "extract",
+    "extract_extra",
+    "resolve",
+]
 
-#: Record dimensions the engines map onto :class:`~pointclouds.points.PointCloud` fields, with the dtype each
-#: array is cast to. Keys are lower-case; callers may pass any case (``"X"`` and ``"x"`` are the same dimension).
+#: Standard LAS dimensions the engines map onto :class:`~pointclouds.points.PointCloud` fields, with the dtype
+#: each array is cast to. Keys are lower-case; callers may pass any case (``"X"`` and ``"x"`` are one dimension).
+#: This is the full standard attribute table; a given file's point format carries only some of these, and a
+#: dimension the format omits reads back as a zero-length array (the "empty means absent" convention).
 CANONICAL: dict[str, type] = {
     "x": np.float64,
     "y": np.float64,
     "z": np.float64,
     "intensity": np.uint16,
-    "classification": np.uint8,
     "return_number": np.uint8,
+    "number_of_returns": np.uint8,
+    "classification": np.uint8,
+    # The LAS 1.4 scan_angle field (point formats 6-10), an int16 in 0.006-degree increments. The legacy
+    # scan_angle_rank of point formats 0-5 (int8, whole degrees) has different units and is deliberately not
+    # mapped onto this name, so a cross-format read/write never silently rescales the angle.
+    "scan_angle": np.int16,
+    "user_data": np.uint8,
+    "point_source_id": np.uint16,
+    "gps_time": np.float64,
+    "red": np.uint16,
+    "green": np.uint16,
+    "blue": np.uint16,
+    "nir": np.uint16,
 }
 
 #: The coordinate dimensions. laspy always exposes these as scaled doubles, whatever the point format declares,
@@ -65,16 +87,17 @@ def resolve(dimensions: tuple[str, ...] | None) -> tuple[str, ...]:
 
         ``None`` is the "everything this package maps" request, which is what both engines pass by default:
 
-        >>> resolve(None)
-        ('x', 'y', 'z', 'intensity', 'classification', 'return_number')
+        >>> resolve(None)[:4]
+        ('x', 'y', 'z', 'intensity')
 
         A dimension the package does not map is refused rather than quietly returned empty:
 
-        >>> resolve(("x", "gps_time"))
+        >>> resolve(("x", "elevation_percentile"))
         Traceback (most recent call last):
             ...
-        KeyError: "unknown dimension(s) ['gps_time']; this engine reads ['classification', 'intensity', \
-'return_number', 'x', 'y', 'z']"
+        KeyError: "unknown standard dimension(s) ['elevation_percentile']; this engine reads \
+['blue', 'classification', 'gps_time', 'green', 'intensity', 'nir', 'number_of_returns', 'point_source_id', \
+'red', 'return_number', 'scan_angle', 'user_data', 'x', 'y', 'z']"
     """
     if dimensions is None:
         return tuple(CANONICAL)
@@ -83,7 +106,7 @@ def resolve(dimensions: tuple[str, ...] | None) -> tuple[str, ...]:
     requested = tuple(dict.fromkeys(name.lower() for name in dimensions))
     unknown = [name for name in requested if name not in CANONICAL]
     if unknown:
-        raise KeyError(f"unknown dimension(s) {unknown}; this engine reads {sorted(CANONICAL)}")
+        raise KeyError(f"unknown standard dimension(s) {unknown}; this engine reads {sorted(CANONICAL)}")
     return requested
 
 
@@ -169,6 +192,77 @@ def extract(source: _RecordSource, requested: tuple[str, ...]) -> dict[str, np.n
     return arrays
 
 
+def extra_dimension_names(source: _RecordSource) -> tuple[str, ...]:
+    """Return the names of any extra (``ExtraBytes``) dimensions the source carries, in file order.
+
+    These are the non-standard, per-file custom dimensions - anything the point format declares that is not one
+    of the canonical LAS fields. They pass through read and write by their own name and native dtype. A name
+    that collides with a canonical dimension is **excluded**: that dimension is read through the canonical path
+    instead, so a custom dimension named like a standard field can never overwrite or mis-cast it.
+
+    Args:
+        source: a laspy record source (``LasData`` or ``ScaleAwarePointRecord``).
+
+    Returns:
+        The extra dimension names (lower-case), minus any that are canonical, or an empty tuple when none.
+
+    Examples:
+        A plain point format carries no extras:
+
+        >>> import laspy
+        >>> cloud = laspy.LasData(laspy.LasHeader(version="1.4", point_format=6))
+        >>> extra_dimension_names(cloud)
+        ()
+
+        A custom dimension added to the format shows up, lower-cased:
+
+        >>> import laspy
+        >>> header = laspy.LasHeader(version="1.4", point_format=6)
+        >>> header.add_extra_dim(laspy.ExtraBytesParams(name="Amplitude", type="f4"))
+        >>> extra_dimension_names(laspy.LasData(header))
+        ('amplitude',)
+    """
+    extra = getattr(source.point_format, "extra_dimension_names", None)
+    if extra is None:
+        return ()
+    return tuple(name for name in (str(n).lower() for n in extra) if name not in CANONICAL)
+
+
+def extract_extra(source: _RecordSource) -> dict[str, np.ndarray]:
+    """Pull every extra (``ExtraBytes``) dimension out of a source as owning copies of its native dtype.
+
+    Args:
+        source: a laspy record source (``LasData`` or ``ScaleAwarePointRecord``).
+
+    Returns:
+        A mapping of extra dimension name to array, keeping each dimension's own numpy dtype (unlike the
+        canonical fields, extras are not cast). Empty when the file declares no extra dimensions.
+
+    Examples:
+        An extra dimension comes back by its own name and dtype, as an owning copy:
+
+        >>> import laspy
+        >>> import numpy as np
+        >>> header = laspy.LasHeader(version="1.4", point_format=6)
+        >>> header.add_extra_dim(laspy.ExtraBytesParams(name="amplitude", type="f4"))
+        >>> cloud = laspy.LasData(header)
+        >>> cloud.x = np.array([0.0, 1.0])
+        >>> cloud.amplitude = np.array([1.5, 2.5], dtype=np.float32)
+        >>> extras = extract_extra(cloud)
+        >>> extras["amplitude"].tolist()
+        [1.5, 2.5]
+        >>> extras["amplitude"].dtype.name
+        'float32'
+
+        A file with no extras yields an empty mapping:
+
+        >>> import laspy
+        >>> extract_extra(laspy.LasData(laspy.LasHeader(version="1.4", point_format=6)))
+        {}
+    """
+    return {name: np.array(getattr(source, name), copy=True) for name in extra_dimension_names(source)}
+
+
 def clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, float]) -> dict[str, np.ndarray]:
     """Drop points outside ``bbox`` exactly, to the float edge. Shared by the COPC and EPT windowed engines.
 
@@ -189,8 +283,30 @@ def clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, 
     Returns:
         The same mapping with every array masked to the points inside the box. A zero-length (undeclared)
         dimension is left untouched rather than indexed with a full-length mask.
+
+    Examples:
+        Only the points inside the (inclusive) box survive, every array masked in step:
+
+        >>> import numpy as np
+        >>> arrays = {"x": np.array([0.0, 1.0, 2.0]), "y": np.array([0.0, 1.0, 2.0]),
+        ...           "classification": np.array([2, 5, 2], dtype=np.uint8)}
+        >>> kept = clip_to_box(arrays, (0.0, 0.0, 1.0, 1.0))
+        >>> kept["x"].tolist()
+        [0.0, 1.0]
+        >>> kept["classification"].tolist()
+        [2, 5]
+
+        An undeclared (zero-length) dimension is left alone, never indexed by the mask:
+
+        >>> import numpy as np
+        >>> arrays = {"x": np.array([0.0, 9.0]), "y": np.array([0.0, 9.0]),
+        ...           "nir": np.empty(0, dtype=np.uint16)}
+        >>> clip_to_box(arrays, (-1.0, -1.0, 1.0, 1.0))["nir"].size
+        0
     """
     xmin, ymin, xmax, ymax = bbox
     x, y = arrays["x"], arrays["y"]
     keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
-    return {name: (values[keep] if values.size == keep.size else values) for name, values in arrays.items()}
+    # Mask on the point axis: a full-length array (1-D or a vector (N, k) extra) is masked on its first axis in
+    # step with x/y; a zero-length (undeclared/absent) array is left alone rather than indexed.
+    return {name: (values[keep] if len(values) == len(keep) else values) for name, values in arrays.items()}

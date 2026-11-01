@@ -20,7 +20,8 @@ if TYPE_CHECKING:
 __all__ = ["bbox_mask", "build_mask"]
 
 #: The attribute dimensions :func:`build_mask` can filter on, each a membership test against the given value(s).
-#: Ordered as everywhere else in the package (:data:`pointclouds.points._ATTRIBUTE_DTYPES`, ``ops.merge``).
+#: These are the subset that makes sense as a discrete membership filter; the full attribute table lives in
+#: :data:`pointclouds.io._records.CANONICAL`.
 _ATTRIBUTE_CRITERIA = ("intensity", "classification", "return_number")
 
 

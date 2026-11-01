@@ -12,7 +12,10 @@ import pytest
 
 from pointclouds.io import _records
 
-ALL_DIMENSIONS = {"x", "y", "z", "intensity", "classification", "return_number"}
+#: Every canonical dimension the package maps (derived so the tests follow the contract, not a frozen copy).
+ALL_DIMENSIONS = set(_records.CANONICAL)
+#: The subset the ``full_source`` fixture actually declares and carries.
+FULL_SOURCE_DIMS = {"x", "y", "z", "intensity", "classification", "return_number"}
 
 
 class _PointFormat:
@@ -95,22 +98,22 @@ class TestResolve:
         "dimensions, unknown",
         [
             (("nosuchdim",), "nosuchdim"),
-            (("X", "gps_time"), "gps_time"),
-            (("RED",), "red"),
+            (("X", "elevation_percentile"), "elevation_percentile"),
+            (("HeightAboveGround",), "heightaboveground"),
         ],
     )
     def test_an_unknown_dimension_is_refused(self, dimensions, unknown):
-        """A dimension this package does not map fails loudly rather than coming back empty.
+        """A standard dimension this package does not map fails loudly rather than coming back empty.
 
         Args:
             dimensions: the requested dimension names.
             unknown: the name expected to be reported as unknown.
 
         Test scenario:
-            Names laspy may well declare - gps_time, red - are still not ones PointCloud holds, so asking for
-            them is a mistake worth naming, not an empty array.
+            A non-standard name (an extra/derived dimension, not part of the canonical LAS table) is not a
+            standard dimension `resolve` accepts, so asking for it by `dimensions=` is a mistake worth naming.
         """
-        with pytest.raises(KeyError, match="unknown dimension") as excinfo:
+        with pytest.raises(KeyError, match="unknown standard dimension") as excinfo:
             _records.resolve(dimensions)
 
         assert unknown in str(excinfo.value), f"the error should name {unknown!r}, got: {excinfo.value}"
@@ -137,7 +140,7 @@ class TestDeclaredNames:
         Test scenario:
             A format declaring upper-case coordinates reports them lower-cased, so membership tests work.
         """
-        assert _records.declared_names(full_source) == ALL_DIMENSIONS, "declared names should be lower-cased"
+        assert _records.declared_names(full_source) == FULL_SOURCE_DIMS, "declared names should be lower-cased"
 
     def test_a_sparse_format_declares_less(self):
         """A format that carries no attributes declares only its coordinates.
@@ -154,20 +157,23 @@ class TestExtract:
     """`extract` turns a record source into the mapping `PointCloud` is built from."""
 
     def test_every_requested_dimension_is_present_and_typed(self, full_source):
-        """The returned mapping is keyed by exactly what was asked for, with the canonical dtypes.
+        """The returned mapping is keyed by every canonical dimension, with the canonical dtypes.
 
         Test scenario:
-            A full request returns six aligned arrays, coordinates as float64 and attributes as their own
-            integer types.
+            A full request returns one entry per canonical dimension; the ones the source declares are aligned
+            arrays of the canonical dtype, and the ones it omits are zero-length (empty means absent).
         """
         arrays = _records.extract(full_source, _records.resolve(None))
 
         assert set(arrays) == ALL_DIMENSIONS, f"expected every canonical dimension, got {sorted(arrays)}"
-        assert all(values.shape == (2,) for values in arrays.values()), "arrays must stay aligned"
+        assert all(arrays[name].shape == (2,) for name in FULL_SOURCE_DIMS), "declared dims must stay aligned"
+        assert all(arrays[name].shape == (0,) for name in ALL_DIMENSIONS - FULL_SOURCE_DIMS), (
+            "an undeclared dimension must come back empty"
+        )
         assert arrays["x"].dtype == np.float64, f"x should be float64, got {arrays['x'].dtype}"
         assert arrays["intensity"].dtype == np.uint16, f"intensity should be uint16, got {arrays['intensity'].dtype}"
-        assert arrays["classification"].dtype == np.uint8, "classification should be uint8"
-        assert arrays["return_number"].dtype == np.uint8, "return_number should be uint8"
+        assert arrays["gps_time"].dtype == np.float64, "gps_time should be float64"
+        assert arrays["red"].dtype == np.uint16, "red should be uint16"
 
     def test_a_subset_returns_only_that_subset(self, full_source):
         """Asking for two dimensions reads two, which is what makes a partial read cheaper.
@@ -270,3 +276,52 @@ class TestExtractAlwaysCopies:
 
         assert values[0] == 2, "extract returned a view; mutating the result reached the source"
         assert arrays["classification"].base is None, "the returned array should own its data"
+
+
+class TestExtraDimensionCollision:
+    """An extra dimension whose name is a canonical one must not clobber the standard field (M1)."""
+
+    class _FormatWithExtras:
+        """A point format that lists some extra dimension names, one colliding with a canonical key."""
+
+        def __init__(self, dimension_names, extra_dimension_names):
+            self.dimension_names = dimension_names
+            self.extra_dimension_names = extra_dimension_names
+
+    def test_a_canonical_named_extra_is_excluded_from_the_extras(self):
+        """`extra_dimension_names` drops a name that is already a canonical dimension, keeping genuine extras.
+
+        A file with an ExtraBytes dimension named like a standard LAS field (e.g. `gps_time`) would otherwise
+        overwrite the canonical entry on the `arrays.update(extract_extra(...))` merge and be mis-cast.
+        """
+        fmt = self._FormatWithExtras(
+            dimension_names=("X", "Y", "Z", "gps_time", "amplitude"),
+            extra_dimension_names=("gps_time", "Amplitude"),
+        )
+        source = _Source(fmt)
+
+        names = _records.extra_dimension_names(source)
+        assert names == ("amplitude",), f"a canonical-named extra must be excluded; got {names}"
+
+
+class TestClipToBoxVectorAlignment:
+    """clip_to_box must mask a vector (N, k) array on its point axis, in step with x/y (R2-M1)."""
+
+    def test_a_vector_array_is_masked_in_step(self):
+        """A (N, k) array is masked on its first axis, not left whole while x/y shrink (which would misalign)."""
+        arrays = {
+            "x": np.array([0.0, 5.0, 1.0]),
+            "y": np.array([0.0, 5.0, 1.0]),
+            "vecdim": np.array([[1, 1], [2, 2], [3, 3]], dtype=np.uint8),
+        }
+
+        kept = _records.clip_to_box(arrays, (-1.0, -1.0, 2.0, 2.0))
+
+        assert kept["x"].tolist() == [0.0, 1.0], "x should drop the out-of-box point"
+        assert kept["vecdim"].tolist() == [[1, 1], [3, 3]], "the vector dim must drop the same row"
+
+    def test_an_absent_dimension_is_left_untouched(self):
+        """A zero-length (absent) array is not indexed by the mask."""
+        arrays = {"x": np.array([0.0, 9.0]), "y": np.array([0.0, 9.0]), "nir": np.empty(0, dtype=np.uint16)}
+
+        assert _records.clip_to_box(arrays, (-1.0, -1.0, 1.0, 1.0))["nir"].size == 0

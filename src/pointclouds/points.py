@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import os
 import warnings
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -30,6 +30,7 @@ import numpy as np
 from pyproj import CRS, Transformer
 from pyproj.transformer import TransformerGroup
 
+from pointclouds.io import _records
 from pointclouds.io import copc as _copc
 from pointclouds.io import ept as _ept
 from pointclouds.io import las as _las
@@ -40,13 +41,6 @@ from pointclouds.ops import grid as _grid
 from pointclouds.ops import merge as _merge
 
 __all__ = ["PointCloud"]
-
-#: Attribute arrays, in the order :meth:`PointCloud.dimensions` reports them, with the dtype each is held as.
-_ATTRIBUTE_DTYPES: dict[str, type] = {
-    "intensity": np.uint16,
-    "classification": np.uint8,
-    "return_number": np.uint8,
-}
 
 
 class PointCloud:
@@ -79,21 +73,24 @@ class PointCloud:
         x: np.ndarray,
         y: np.ndarray,
         z: np.ndarray,
-        intensity: np.ndarray | None = None,
-        classification: np.ndarray | None = None,
-        return_number: np.ndarray | None = None,
+        *,
         crs: CRS | str | None = None,
+        **attributes: np.ndarray | None,
     ) -> None:
         """Build a cloud from arrays, rejecting coordinate arrays that disagree in length.
+
+        Any per-point attribute is passed by keyword: the standard LAS dimensions (``intensity``,
+        ``classification``, ``return_number``, ``number_of_returns``, ``scan_angle``, ``point_source_id``,
+        ``gps_time``, ``red``/``green``/``blue``, ``nir``, ``user_data``) are cast to their canonical dtype;
+        any other keyword is kept as an extra dimension of its own dtype. A ``None`` or zero-length attribute
+        means "absent", and is simply not carried.
 
         Args:
             x: ``(N,)`` x-coordinates.
             y: ``(N,)`` y-coordinates.
             z: ``(N,)`` z-coordinates.
-            intensity: ``(N,)`` return intensity, or ``None`` for an empty array.
-            classification: ``(N,)`` ASPRS class codes, or ``None`` for an empty array.
-            return_number: ``(N,)`` return numbers, or ``None`` for an empty array.
             crs: anything :class:`pyproj.CRS` accepts, or ``None``.
+            **attributes: per-point arrays by dimension name, e.g. ``classification=...``, ``gps_time=...``.
 
         Raises:
             ValueError: if ``x``, ``y`` and ``z`` do not all share one length, or if an attribute array is
@@ -102,11 +99,13 @@ class PointCloud:
         self._x = np.asarray(x, dtype=np.float64)
         self._y = np.asarray(y, dtype=np.float64)
         self._z = np.asarray(z, dtype=np.float64)
-        self._attributes = {
-            "intensity": _as_attribute(intensity, np.uint16),
-            "classification": _as_attribute(classification, np.uint8),
-            "return_number": _as_attribute(return_number, np.uint8),
-        }
+        self._attributes: dict[str, np.ndarray] = {}
+        for name, values in attributes.items():
+            if values is None:
+                continue
+            key = name.lower()
+            dtype = _records.CANONICAL.get(key)  # a standard dim is cast; an extra dim keeps its own dtype
+            self._attributes[key] = np.asarray(values, dtype=dtype) if dtype is not None else np.asarray(values)
         self._crs = CRS.from_user_input(crs) if isinstance(crs, str) else crs
         self._header: _las.LasHeaderInfo | None = None
         self._source: Path | None = None
@@ -116,8 +115,12 @@ class PointCloud:
         if not (len(self._y) == n and len(self._z) == n):
             raise ValueError(f"x/y/z must share a length; got {len(self._x)}, {len(self._y)}, {len(self._z)}")
         for name, values in self._attributes.items():
-            if values.size and values.size != n:
-                raise ValueError(f"{name} has length {values.size}, expected 0 or {n}")
+            # The point-axis count: size for a 1-D attribute, N for a vector (N, k) extra, and 1 for a 0-d
+            # scalar - so a multi-element ExtraBytes dimension is not rejected on its total element count and a
+            # scalar yields a clean ValueError rather than len()'s "unsized object" TypeError.
+            count = values.shape[0] if values.ndim else 1
+            if values.size and count != n:
+                raise ValueError(f"{name} has length {count}, expected 0 or {n}")
 
     @classmethod
     def read_file(
@@ -180,7 +183,7 @@ class PointCloud:
         cloud._x = _EMPTY_F8
         cloud._y = _EMPTY_F8
         cloud._z = _EMPTY_F8
-        cloud._attributes = {name: np.empty(0, dtype=dtype) for name, dtype in _ATTRIBUTE_DTYPES.items()}
+        cloud._attributes = {}  # populated on load(); until then dimensions come from the header
         cloud._crs = header.crs
         cloud._header = header
         cloud._source = Path(path)
@@ -264,6 +267,75 @@ class PointCloud:
             )
         return cls(crs=crs, **arrays)
 
+    @classmethod
+    def iter_chunks(
+        cls,
+        path: str | Path,
+        points_per_iteration: int = 1_000_000,
+        *,
+        crs: CRS | str | None = None,
+    ) -> Iterator[PointCloud]:
+        """Stream a plain LAS/LAZ file as a sequence of eager clouds, a fixed number of points at a time.
+
+        For a large non-indexed tile that will not fit in memory at once. Each yielded cloud is eager and holds
+        one chunk; the whole file is never materialised. For spatial (rather than linear) access to a large
+        cloud, use COPC/EPT and :meth:`read_window` instead.
+
+        Args:
+            path: the LAS/LAZ file to stream.
+            points_per_iteration: how many points each yielded cloud holds (the last holds the remainder).
+            crs: the CRS to attach to each chunk; ``None`` reads it from the file header once, up front.
+
+        Yields:
+            One eager :class:`PointCloud` per chunk, in file order.
+
+        Raises:
+            FileNotFoundError: when the path does not exist.
+            ValueError: when the suffix is neither ``.las`` nor ``.laz``, or ``points_per_iteration`` is not
+                positive.
+        """
+        resolved_crs = (CRS.from_user_input(crs) if isinstance(crs, str) else crs) or _las.read_header(path).crs
+        for arrays in _las.read_points_chunked(path, points_per_iteration):
+            yield cls(crs=resolved_crs, **arrays)
+
+    def to_file(
+        self,
+        path: str | Path,
+        *,
+        scales: tuple[float, float, float] = (0.01, 0.01, 0.01),
+        offsets: tuple[float, float, float] | None = None,
+    ) -> Path:
+        """Write this cloud to ``path`` as ``.las`` / ``.laz``, round-tripping its attributes and CRS.
+
+        The suffix picks the container (``.laz`` compressed, ``.las`` not); the point format is chosen from the
+        attributes present, so RGB or NIR is preserved. Extra (``ExtraBytes``) dimensions are written back as
+        their own dimensions. A lazy cloud is loaded first.
+
+        Args:
+            path: destination file; its suffix decides compression.
+            scales: the per-axis quantisation step stored in the header (default centimetre precision).
+            offsets: the per-axis header offset; ``None`` uses each axis's minimum.
+
+        Returns:
+            The path written, as a :class:`~pathlib.Path`.
+
+        Raises:
+            ValueError: when the suffix is neither ``.las`` nor ``.laz``.
+
+        Examples:
+            >>> import numpy as np
+            >>> cloud = PointCloud(x=np.arange(3.0), y=np.zeros(3), z=np.zeros(3),
+            ...                    classification=np.array([2, 2, 5], dtype=np.uint8))
+            >>> out = cloud.to_file("round_trip.laz")  # doctest: +SKIP
+            >>> PointCloud.read_file(out).classification.tolist()  # doctest: +SKIP
+            [2, 2, 5]
+        """
+        self.load()
+        _las.write(
+            path, self._x, self._y, self._z, attributes=self._attributes, crs=self._crs, scales=scales, offsets=offsets
+        )
+        return Path(path)
+
     def load(self) -> PointCloud:
         """Read this cloud's record arrays if they are not in memory yet.
 
@@ -282,7 +354,9 @@ class PointCloud:
         self._x = arrays["x"]
         self._y = arrays["y"]
         self._z = arrays["z"]
-        self._attributes = {name: arrays[name] for name in _ATTRIBUTE_DTYPES}
+        # Everything read_points returns beyond the coordinates - the standard attribute table plus any extra
+        # (ExtraBytes) dimensions the file carried - becomes an attribute.
+        self._attributes = {name: values for name, values in arrays.items() if name not in ("x", "y", "z")}
         self._loaded = True
         return self
 
@@ -311,20 +385,115 @@ class PointCloud:
         """``(N,)`` float64 z-coordinates, loading the records first if needed."""
         return self.load()._z
 
+    def _attribute(self, name: str) -> np.ndarray:
+        """Return the attribute array named ``name``, loading first, or an empty array of its dtype when absent.
+
+        Args:
+            name: a canonical attribute name.
+
+        Returns:
+            The ``(N,)`` array, or a zero-length array of the canonical dtype when the cloud does not carry it.
+        """
+        return self.load()._attributes.get(name, np.empty(0, dtype=_records.CANONICAL.get(name, np.float64)))
+
     @property
     def intensity(self) -> np.ndarray:
         """``(N,)`` uint16 return intensity (empty when absent), loading the records first if needed."""
-        return self.load()._attributes["intensity"]
+        return self._attribute("intensity")
 
     @property
     def classification(self) -> np.ndarray:
         """``(N,)`` uint8 ASPRS class codes (empty when absent), loading the records first if needed."""
-        return self.load()._attributes["classification"]
+        return self._attribute("classification")
 
     @property
     def return_number(self) -> np.ndarray:
         """``(N,)`` uint8 return numbers (empty when absent), loading the records first if needed."""
-        return self.load()._attributes["return_number"]
+        return self._attribute("return_number")
+
+    @property
+    def number_of_returns(self) -> np.ndarray:
+        """``(N,)`` uint8 number of returns in the pulse (empty when absent), loading the records if needed."""
+        return self._attribute("number_of_returns")
+
+    @property
+    def scan_angle(self) -> np.ndarray:
+        """``(N,)`` int16 scan angle (empty when absent), loading the records first if needed.
+
+        This is the LAS 1.4 ``scan_angle`` field (point formats 6-10, 0.006-degree increments). The legacy
+        ``scan_angle_rank`` of formats 0-5 uses different units and is not mapped onto this field, so it reads
+        back empty on a pre-1.4 file.
+        """
+        return self._attribute("scan_angle")
+
+    @property
+    def point_source_id(self) -> np.ndarray:
+        """``(N,)`` uint16 point source id (empty when absent), loading the records first if needed."""
+        return self._attribute("point_source_id")
+
+    @property
+    def gps_time(self) -> np.ndarray:
+        """``(N,)`` float64 GPS time (empty when absent), loading the records first if needed."""
+        return self._attribute("gps_time")
+
+    @property
+    def red(self) -> np.ndarray:
+        """``(N,)`` uint16 red channel (empty when absent), loading the records first if needed."""
+        return self._attribute("red")
+
+    @property
+    def green(self) -> np.ndarray:
+        """``(N,)`` uint16 green channel (empty when absent), loading the records first if needed."""
+        return self._attribute("green")
+
+    @property
+    def blue(self) -> np.ndarray:
+        """``(N,)`` uint16 blue channel (empty when absent), loading the records first if needed."""
+        return self._attribute("blue")
+
+    @property
+    def nir(self) -> np.ndarray:
+        """``(N,)`` uint16 near-infrared channel (empty when absent), loading the records first if needed."""
+        return self._attribute("nir")
+
+    @property
+    def user_data(self) -> np.ndarray:
+        """``(N,)`` uint8 user-data field (empty when absent), loading the records first if needed."""
+        return self._attribute("user_data")
+
+    @property
+    def attributes(self) -> dict[str, np.ndarray]:
+        """The per-point attribute arrays by name, loading the records first if needed.
+
+        The mapping holds only the dimensions the cloud actually carries - the standard attribute table where
+        populated, plus any extra (``ExtraBytes``) dimensions. It is a fresh dict, so adding or removing a key
+        does not change the cloud; the arrays inside are the cloud's own, so editing one *in place* does reach
+        the cloud (copy an array first if that matters).
+
+        Examples:
+            - The mapping holds exactly the attributes the cloud was built with, standard or extra:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2),
+                ...                    classification=np.array([2, 5], dtype=np.uint8),
+                ...                    amplitude=np.array([1.5, 2.5], dtype=np.float32))
+                >>> sorted(cloud.attributes)
+                ['amplitude', 'classification']
+                >>> cloud.attributes["classification"].tolist()
+                [2, 5]
+
+                ```
+            - It is a fresh dict, so adding a key to it does not change the cloud:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2))
+                >>> cloud.attributes["classification"] = np.ones(2)
+                >>> "classification" in cloud.attributes
+                False
+
+                ```
+        """
+        return dict(self.load()._attributes)
 
     @property
     def crs(self) -> CRS | None:
@@ -383,16 +552,29 @@ class PointCloud:
         """
         self.load()
         lookup = {"x": self._x, "y": self._y, "z": self._z, **self._attributes}
+        # A known standard dimension the cloud does not carry resolves to an empty array (so it falls into the
+        # "carries none of them" message below), rather than looking like a typo. A name that is neither held
+        # nor a canonical dimension is a genuine unknown.
+        for name in dimensions:
+            key = name.lower()
+            if key not in lookup and key in _records.CANONICAL:
+                lookup[key] = np.empty(0, dtype=_records.CANONICAL[key])
         try:
             cols = [np.asarray(lookup[name.lower()], dtype=float) for name in dimensions]
         except KeyError as exc:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
         width = len(self._x)
-        empty = [name for name, col in zip(dimensions, cols, strict=True) if col.size != width]
-        if empty:
+        absent = [name for name, col in zip(dimensions, cols, strict=True) if col.size == 0]
+        non_scalar = [name for name, col in zip(dimensions, cols, strict=True) if col.size and col.shape != (width,)]
+        if absent:
             raise ValueError(
-                f"cannot stack dimension(s) {empty} - this cloud carries none of them ({width} points, but "
+                f"cannot stack dimension(s) {absent} - this cloud carries none of them ({width} points, but "
                 f"those arrays are empty); request only the dimensions it holds"
+            )
+        if non_scalar:
+            raise ValueError(
+                f"cannot stack dimension(s) {non_scalar} - they are not a single per-point scalar column "
+                f"(a vector/multi-element extra); to_array stacks only 1-D (N,) dimensions"
             )
         return np.column_stack(cols)
 
@@ -705,9 +887,9 @@ class PointCloud:
             transformer = Transformer.from_crs(self._crs, target, always_xy=True)
             x, y = transformer.transform(self.x, self.y, errcheck=errcheck)
             z = self.z.copy()
-        intensity = self.intensity.copy()
-        classification = self.classification.copy()
-        return_number = self.return_number.copy()
+        # Carry every attribute the cloud holds - the standard table and any extra dimensions - by value, so
+        # none is silently dropped by a reprojection and the returned cloud owns independent copies.
+        attributes = {name: values.copy() for name, values in self._attributes.items()}
         if on_invalid != "raise":
             x, y, z = np.asarray(x, np.float64), np.asarray(y, np.float64), np.asarray(z, np.float64)
             valid = np.isfinite(x) & np.isfinite(y)
@@ -717,18 +899,8 @@ class PointCloud:
                 x[~valid] = y[~valid] = z[~valid] = np.nan
             else:  # "drop" - remove the unreprojectable points and their attributes, keeping alignment
                 x, y, z = x[valid], y[valid], z[valid]
-                intensity = intensity[valid] if intensity.size else intensity
-                classification = classification[valid] if classification.size else classification
-                return_number = return_number[valid] if return_number.size else return_number
-        return PointCloud(
-            x=x,
-            y=y,
-            z=z,
-            intensity=intensity,
-            classification=classification,
-            return_number=return_number,
-            crs=target,
-        )
+                attributes = {name: (values[valid] if values.size else values) for name, values in attributes.items()}
+        return PointCloud(x=x, y=y, z=z, crs=target, **attributes)
 
     def __len__(self) -> int:
         """Return how many points are in memory, loading the records first if needed.
@@ -760,21 +932,6 @@ def _has_vertical_axis(crs: CRS) -> bool:
         ``True`` when the CRS has a vertical component.
     """
     return crs.is_compound or crs.is_vertical or len(crs.axis_info) >= 3
-
-
-def _as_attribute(values: np.ndarray | None, dtype: type) -> np.ndarray:
-    """Return ``values`` as an array of ``dtype``, mapping ``None`` to a zero-length array.
-
-    Args:
-        values: the array to normalise, or ``None``.
-        dtype: the dtype to cast to.
-
-    Returns:
-        An array of ``dtype``; zero-length when ``values`` is ``None``.
-    """
-    if values is None:
-        return np.empty(0, dtype=dtype)
-    return np.asarray(values, dtype=dtype)
 
 
 def _ept_depth(level: int | range | None) -> int | None:
