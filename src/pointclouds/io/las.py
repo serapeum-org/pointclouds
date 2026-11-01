@@ -237,29 +237,81 @@ def write(
     y = np.asarray(y, dtype=np.float64)
     z = np.asarray(z, dtype=np.float64)
     n = x.shape[0]
-    attributes = {name.lower(): np.asarray(values) for name, values in (attributes or {}).items()}
-    for name, values in attributes.items():
+    attributes = _validated_write_attributes(attributes, n)
+
+    header = laspy.LasHeader(version="1.4", point_format=_point_format_for(attributes))
+    header.scales = np.asarray(scales, dtype=np.float64)
+    header.offsets = np.asarray(offsets if offsets is not None else _default_offsets(x, y, z, n), dtype=np.float64)
+    if crs is not None:
+        header.add_crs(crs)
+    extra = _declare_extra_dims(header, attributes)
+
+    las = laspy.LasData(header)
+    las.x, las.y, las.z = x, y, z
+    _assign_attributes(las, attributes, extra)
+    las.write(str(resolved))
+
+
+def _validated_write_attributes(attributes: dict[str, np.ndarray] | None, n: int) -> dict[str, np.ndarray]:
+    """Lower-case the attribute names and check each array's length against the point count.
+
+    Args:
+        attributes: the caller's attribute mapping, or ``None``.
+        n: the point count ``len(x)``.
+
+    Returns:
+        The attributes as arrays keyed by lower-case name.
+
+    Raises:
+        ValueError: when an attribute's point-axis length is neither 0 (absent) nor ``n``.
+    """
+    normalised = {name.lower(): np.asarray(values) for name, values in (attributes or {}).items()}
+    for name, values in normalised.items():
         # Point-axis count: the first axis for a 1-D/vector array, 1 for a 0-d scalar - so a vector (N, k) extra
         # is validated on N (not N*k) and a scalar gives a clean ValueError, not len()'s TypeError.
         count = values.shape[0] if values.ndim else 1
         if values.size and count != n:
             raise ValueError(f"{name} has length {count}, expected 0 or {n}")
+    return normalised
 
-    header = laspy.LasHeader(version="1.4", point_format=_point_format_for(attributes))
-    header.scales = np.asarray(scales, dtype=np.float64)
-    # Default each axis offset to its own minimum, z included, so a large-magnitude band is representable on
-    # every axis alike (a hard-coded z offset of 0.0 would overflow the scaled int32 for a large z while x/y,
-    # offset by their min, would not).
-    header.offsets = np.asarray(
-        offsets
-        if offsets is not None
-        else (float(x.min()) if n else 0.0, float(y.min()) if n else 0.0, float(z.min()) if n else 0.0),
-        dtype=np.float64,
-    )
-    if crs is not None:
-        header.add_crs(crs)
 
-    standard = {name for name in attributes if name in _records.CANONICAL}
+def _default_offsets(x: np.ndarray, y: np.ndarray, z: np.ndarray, n: int) -> tuple[float, float, float]:
+    """Default header offsets: each axis's own minimum (0.0 for an empty cloud).
+
+    z is offset by its own minimum like x and y, so a large-magnitude band is representable on every axis alike
+    (a hard-coded z offset of 0.0 would overflow the scaled int32 for a large z while x/y, offset by their min,
+    would not).
+
+    Args:
+        x: x-coordinates.
+        y: y-coordinates.
+        z: z-coordinates.
+        n: the point count; ``0`` gives ``(0.0, 0.0, 0.0)`` since there is no minimum.
+
+    Returns:
+        The ``(x, y, z)`` offsets.
+    """
+    return (_axis_offset(x, n), _axis_offset(y, n), _axis_offset(z, n))
+
+
+def _axis_offset(values: np.ndarray, n: int) -> float:
+    """One axis's default offset: its minimum, or ``0.0`` for an empty cloud."""
+    return float(values.min()) if n else 0.0
+
+
+def _declare_extra_dims(header: laspy.LasHeader, attributes: dict[str, np.ndarray]) -> set[str]:
+    """Declare every non-canonical attribute on ``header`` as an ``ExtraBytes`` dimension and return their names.
+
+    Args:
+        header: the header to add the extra dimensions to.
+        attributes: the validated attribute mapping.
+
+    Returns:
+        The set of extra (non-canonical) attribute names.
+
+    Raises:
+        ValueError: when an extra array has more than two axes (write supports scalar or vector extras only).
+    """
     extra = {name for name in attributes if name not in _records.CANONICAL}
     for name in extra:
         values = attributes[name]
@@ -271,14 +323,19 @@ def write(
         # A vector (N, k) extra is declared as a k-element field; a scalar (N,) extra as its plain dtype.
         extra_type = np.dtype((values.dtype, values.shape[1])) if values.ndim > 1 else values.dtype
         header.add_extra_dim(laspy.ExtraBytesParams(name=name, type=extra_type))
+    return extra
 
-    las = laspy.LasData(header)
-    las.x, las.y, las.z = x, y, z
-    for name in standard:
-        if attributes[name].size:
-            # write targets point formats 6-8, which declare every canonical standard dimension by its canonical
-            # name (scan_angle, not the legacy scan_angle_rank), so each name is the right field here.
-            setattr(las, name, attributes[name])
-    for name in extra:
-        setattr(las, name, attributes[name])
-    las.write(str(resolved))
+
+def _assign_attributes(las: laspy.LasData, attributes: dict[str, np.ndarray], extra: set[str]) -> None:
+    """Write each attribute array onto its LAS field (standard dims) or ExtraBytes dimension.
+
+    Args:
+        las: the in-memory cloud to populate.
+        attributes: the validated attribute mapping.
+        extra: the extra (non-canonical) names, from :func:`_declare_extra_dims`.
+    """
+    for name, values in attributes.items():
+        # A present-but-empty standard dim is skipped (absent); write targets point formats 6-8, which declare
+        # every canonical dimension by its canonical name, so each standard name is the right field here.
+        if name in extra or values.size:
+            setattr(las, name, values)
