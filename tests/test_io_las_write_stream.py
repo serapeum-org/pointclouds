@@ -334,3 +334,20 @@ class TestWrittenFormatMaterializesDimensions:
         assert back.gps_time.shape == (3,), "point format 6 mandates gps_time, so it is present after a round-trip"
         assert back.gps_time.tolist() == [0.0, 0.0, 0.0], "an unwritten gps_time is zero-filled, not meaningful"
         assert np.array_equal(back.classification, cloud.classification), "populated dims keep their values"
+
+
+class TestOffsetSymmetry:
+    """z gets its own offset like x/y, so a large-magnitude z band is representable (L1)."""
+
+    def test_a_large_z_round_trips_like_a_large_xy(self, tmp_path):
+        """A z near 3e7 fits when the z offset defaults to z.min(), as x/y already do.
+
+        With a hard-coded z offset of 0.0 and the default 0.01 scale, z near 3e7 overflowed the stored int32
+        while an x/y of the same magnitude (offset = min) did not - an asymmetry. z now uses its own minimum.
+        """
+        z = 3.0e7 + np.arange(4, dtype=float)
+        cloud = PointCloud(x=np.arange(4, dtype=float), y=np.arange(4, dtype=float), z=z)
+
+        back = PointCloud.read_file(cloud.to_file(tmp_path / "bigz.laz"), lazy=False)
+
+        np.testing.assert_allclose(back.z, z, atol=0.005)

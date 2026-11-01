@@ -225,6 +225,10 @@ def write(
     Raises:
         ValueError: when the suffix is neither ``.las`` nor ``.laz``, or an attribute's length is neither 0 nor
             ``len(x)``.
+        OverflowError: propagated from laspy when a value does not fit the stored representation - a coordinate
+            outside the scaled ``int32`` range for the given ``scales`` / ``offsets``, or a field beyond its LAS
+            bit width (e.g. ``return_number`` above 15 on a point format with a 4-bit return field). The write
+            path does no range clamping; pick ``scales`` / ``offsets`` (or values) that fit.
     """
     resolved = Path(path)
     if resolved.suffix.lower() not in _SUFFIXES:
@@ -242,8 +246,13 @@ def write(
 
     header = laspy.LasHeader(version="1.4", point_format=_point_format_for(attributes))
     header.scales = np.asarray(scales, dtype=np.float64)
+    # Default each axis offset to its own minimum, z included, so a large-magnitude band is representable on
+    # every axis alike (a hard-coded z offset of 0.0 would overflow the scaled int32 for a large z while x/y,
+    # offset by their min, would not).
     header.offsets = np.asarray(
-        offsets if offsets is not None else (float(x.min()) if n else 0.0, float(y.min()) if n else 0.0, 0.0),
+        offsets
+        if offsets is not None
+        else (float(x.min()) if n else 0.0, float(y.min()) if n else 0.0, float(z.min()) if n else 0.0),
         dtype=np.float64,
     )
     if crs is not None:
