@@ -229,8 +229,10 @@ def write(
     n = x.shape[0]
     attributes = {name.lower(): np.asarray(values) for name, values in (attributes or {}).items()}
     for name, values in attributes.items():
-        if values.size and values.size != n:
-            raise ValueError(f"{name} has length {values.size}, expected 0 or {n}")
+        # len() counts points (the first axis), so a vector (N, k) ExtraBytes dimension is validated on N, not
+        # on its total element count N*k.
+        if values.size and len(values) != n:
+            raise ValueError(f"{name} has length {len(values)}, expected 0 or {n}")
 
     header = laspy.LasHeader(version="1.4", point_format=_point_format_for(attributes))
     header.scales = np.asarray(scales, dtype=np.float64)
@@ -244,7 +246,10 @@ def write(
     standard = {name for name in attributes if name in _records.CANONICAL}
     extra = {name for name in attributes if name not in _records.CANONICAL}
     for name in extra:
-        header.add_extra_dim(laspy.ExtraBytesParams(name=name, type=attributes[name].dtype))
+        values = attributes[name]
+        # A vector (N, k) extra is declared as a k-element field; a scalar (N,) extra as its plain dtype.
+        extra_type = np.dtype((values.dtype, values.shape[1])) if values.ndim > 1 else values.dtype
+        header.add_extra_dim(laspy.ExtraBytesParams(name=name, type=extra_type))
 
     las = laspy.LasData(header)
     las.x, las.y, las.z = x, y, z

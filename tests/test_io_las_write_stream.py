@@ -283,3 +283,31 @@ class TestScanAngleUnits:
         out = cloud.to_file(tmp_path / "pf6.laz")
 
         assert PointCloud.read_file(out, lazy=False).scan_angle.tolist() == [-2500, 0, 2500]
+
+
+class TestVectorExtraDimension:
+    """A multi-element (N, k) ExtraBytes dimension must read AND write (length check is per-point) (M2)."""
+
+    def test_a_vector_extra_round_trips(self, tmp_path):
+        """An (N, 3) extra dimension survives a write/read, keeping its shape and dtype.
+
+        The length validation must count points (first axis = N), not total elements (N*3), or `to_file` wrongly
+        rejects a cloud that was read cleanly.
+        """
+        cloud = PointCloud(
+            x=np.zeros(2), y=np.zeros(2), z=np.zeros(2),
+            rgb3=np.array([[1, 2, 3], [4, 5, 6]], dtype=np.uint8),
+        )
+        out = cloud.to_file(tmp_path / "vec.laz")
+
+        back = PointCloud.read_file(out, lazy=False)
+        assert back.attributes["rgb3"].shape == (2, 3)
+        assert back.attributes["rgb3"].tolist() == [[1, 2, 3], [4, 5, 6]]
+
+    def test_a_wrong_point_axis_length_is_still_refused(self, tmp_path):
+        """A vector extra with the wrong number of points (not of total elements) is still rejected."""
+        with pytest.raises(ValueError, match="length"):
+            las.write(
+                tmp_path / "bad.laz", np.zeros(2), np.zeros(2), np.zeros(2),
+                attributes={"rgb3": np.zeros((3, 3), dtype=np.uint8)},
+            )
