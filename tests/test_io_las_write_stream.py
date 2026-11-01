@@ -351,3 +351,25 @@ class TestOffsetSymmetry:
         back = PointCloud.read_file(cloud.to_file(tmp_path / "bigz.laz"), lazy=False)
 
         np.testing.assert_allclose(back.z, z, atol=0.005)
+
+
+class TestInputValidationEdges:
+    """Odd attribute shapes give clear errors, not laspy/len internals (R2-L1, R2-L3)."""
+
+    def test_a_zero_dim_attribute_raises_a_named_value_error(self):
+        """A 0-d (scalar) attribute array yields a named ValueError, not len()'s TypeError."""
+        with pytest.raises(ValueError, match="length"):
+            PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3), foo=np.array(5))
+
+    def test_write_rejects_a_zero_dim_attribute_cleanly(self, tmp_path):
+        """las.write mirrors the constructor: a 0-d attribute is a clean ValueError."""
+        with pytest.raises(ValueError, match="length"):
+            las.write(tmp_path / "z.laz", np.zeros(2), np.zeros(2), np.zeros(2), attributes={"foo": np.array(5)})
+
+    def test_write_rejects_a_three_dimensional_extra(self, tmp_path):
+        """An extra with more than two axes is refused with a message naming the limit, not a broadcast error."""
+        with pytest.raises(ValueError, match="3 axes"):
+            las.write(
+                tmp_path / "cube.laz", np.zeros(3), np.zeros(3), np.zeros(3),
+                attributes={"cube": np.zeros((3, 2, 2), dtype=np.uint8)},
+            )

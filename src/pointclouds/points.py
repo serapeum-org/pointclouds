@@ -122,10 +122,12 @@ class PointCloud:
         if not (len(self._y) == n and len(self._z) == n):
             raise ValueError(f"x/y/z must share a length; got {len(self._x)}, {len(self._y)}, {len(self._z)}")
         for name, values in self._attributes.items():
-            # len() is the point-axis count: it is size for a 1-D attribute and N for a vector (N, k) extra, so
-            # a multi-element ExtraBytes dimension is not wrongly rejected on its total element count.
-            if values.size and len(values) != n:
-                raise ValueError(f"{name} has length {len(values)}, expected 0 or {n}")
+            # The point-axis count: size for a 1-D attribute, N for a vector (N, k) extra, and 1 for a 0-d
+            # scalar - so a multi-element ExtraBytes dimension is not rejected on its total element count and a
+            # scalar yields a clean ValueError rather than len()'s "unsized object" TypeError.
+            count = values.shape[0] if values.ndim else 1
+            if values.size and count != n:
+                raise ValueError(f"{name} has length {count}, expected 0 or {n}")
 
     @classmethod
     def read_file(
