@@ -12,15 +12,14 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from pointclouds.io import _records
+
 if TYPE_CHECKING:
     from pyproj import CRS
 
     from pointclouds.points import PointCloud
 
 __all__ = ["merge_arrays"]
-
-#: The attribute dimensions that are carried through a merge, alongside x/y/z.
-_ATTRIBUTES = ("intensity", "classification", "return_number")
 
 
 def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
@@ -67,14 +66,25 @@ def merge_arrays(clouds: Sequence[PointCloud]) -> dict[str, Any]:
         "crs": _resolve_crs(carrying),
     }
 
-    for name in _ATTRIBUTES:
-        arrays = [getattr(c, name) for c in clouds]
+    # Carry every attribute some point-carrying cloud holds - the full canonical table and any ExtraBytes dims -
+    # not a frozen list, so a merge never silently drops a dimension (canonical order first, then extras).
+    carried = {name for c in carrying for name, values in c.attributes.items() if values.size > 0}
+    ordered = [n for n in _records.CANONICAL if n in carried] + sorted(
+        n for n in carried if n not in _records.CANONICAL
+    )
+    for name in ordered:
+        per_cloud = [c.attributes.get(name) for c in clouds]
         # A zero-point cloud (e.g. one filtered to empty) contributes no rows, so it neither has nor needs the
-        # attribute: judge presence only among the clouds that actually carry points. Its size-0 array still
-        # concatenates harmlessly when the attribute is kept.
-        present = [values.size > 0 for values, count in zip(arrays, point_counts, strict=True) if count > 0]
+        # attribute: judge presence only among the clouds that actually carry points.
+        present = [
+            values is not None and values.size > 0
+            for values, count in zip(per_cloud, point_counts, strict=True)
+            if count > 0
+        ]
         if present and all(present):
-            merged[name] = np.concatenate(arrays)
+            reference = next(values for values in per_cloud if values is not None and values.size)
+            filler = np.empty((0, *reference.shape[1:]), dtype=reference.dtype)
+            merged[name] = np.concatenate([values if values is not None else filler for values in per_cloud])
         elif any(present):
             raise ValueError(
                 f"cannot merge: {name!r} is present on some clouds but not others; "

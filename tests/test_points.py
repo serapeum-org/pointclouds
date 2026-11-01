@@ -574,3 +574,32 @@ class TestConstructorKeywordOnlyCrs:
         cloud = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), crs="EPSG:28992")
 
         assert cloud.crs.to_epsg() == 28992
+
+
+class TestMergeWidenedAttributes:
+    """merge must carry the full attribute table and extras, not just the three legacy dims (R2-H1)."""
+
+    def test_merge_preserves_every_shared_attribute(self):
+        """Merging clouds that share gps_time / RGB / an extra keeps them all, concatenated in order."""
+        a = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2),
+                       classification=np.array([2, 2], np.uint8), gps_time=np.array([1.0, 2.0]),
+                       red=np.array([10, 20], np.uint16), amplitude=np.array([0.5, 0.6], np.float32))
+        b = PointCloud(x=np.ones(1), y=np.ones(1), z=np.ones(1),
+                       classification=np.array([5], np.uint8), gps_time=np.array([3.0]),
+                       red=np.array([30], np.uint16), amplitude=np.array([0.7], np.float32))
+
+        merged = PointCloud.merge([a, b])
+
+        assert merged.gps_time.tolist() == [1.0, 2.0, 3.0]
+        assert merged.red.tolist() == [10, 20, 30]
+        assert merged.attributes["amplitude"] == pytest.approx([0.5, 0.6, 0.7])  # float32 extra
+        assert merged.attributes["amplitude"].dtype == np.float32
+        assert merged.classification.tolist() == [2, 2, 5]
+
+    def test_merge_still_rejects_a_dimension_present_on_only_some(self):
+        """The present-on-all-or-none rule still holds for the widened set."""
+        a = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), gps_time=np.array([1.0]))
+        b = PointCloud(x=np.ones(1), y=np.ones(1), z=np.ones(1))
+
+        with pytest.raises(ValueError, match="present on some"):
+            PointCloud.merge([a, b])
