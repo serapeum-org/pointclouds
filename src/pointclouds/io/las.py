@@ -204,6 +204,12 @@ def write(
     cloud carrying RGB or NIR is written to a format that can hold it. Standard canonical dimensions go to their
     LAS fields; any other attribute is written as an ``ExtraBytes`` dimension of its own dtype.
 
+    **A written file carries every dimension its point format declares.** The output is always a LAS 1.4 format
+    (6, 7 or 8), all of which mandate ``gps_time`` (7/8 add RGB, 8 adds NIR). A dimension the cloud does not
+    carry is written **zero-filled**, so reading the file back shows that dimension present (length ``N``) rather
+    than absent - the "empty means absent" convention describes a *fresh* read, not a round-trip, since the file
+    on disk genuinely has the field. Only the dimensions the cloud populated carry meaningful values.
+
     Args:
         path: destination file; the suffix (``.las`` / ``.laz``) decides compression.
         x: ``(N,)`` x-coordinates.

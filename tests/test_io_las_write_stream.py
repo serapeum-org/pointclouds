@@ -311,3 +311,26 @@ class TestVectorExtraDimension:
                 tmp_path / "bad.laz", np.zeros(2), np.zeros(2), np.zeros(2),
                 attributes={"rgb3": np.zeros((3, 3), dtype=np.uint8)},
             )
+
+
+class TestWrittenFormatMaterializesDimensions:
+    """A written LAS 1.4 format records all its declared dims; absent ones read back zero-filled (M3)."""
+
+    def test_absent_gps_time_reads_back_present_and_zero(self, tmp_path):
+        """A cloud with no gps_time, written to point format 6 (which mandates it), reads back N zeros.
+
+        This pins the documented round-trip behaviour: the file genuinely carries gps_time, so the reader shows
+        it present rather than absent. The "empty means absent" convention is about a fresh read, not a
+        write/read round-trip.
+        """
+        cloud = PointCloud(
+            x=np.zeros(3), y=np.zeros(3), z=np.zeros(3),
+            classification=np.array([2, 2, 5], dtype=np.uint8),  # no gps_time
+        )
+        assert cloud.gps_time.size == 0, "the source cloud has no gps_time"
+
+        back = PointCloud.read_file(cloud.to_file(tmp_path / "nogps.laz"), lazy=False)
+
+        assert back.gps_time.shape == (3,), "point format 6 mandates gps_time, so it is present after a round-trip"
+        assert back.gps_time.tolist() == [0.0, 0.0, 0.0], "an unwritten gps_time is zero-filled, not meaningful"
+        assert np.array_equal(back.classification, cloud.classification), "populated dims keep their values"
