@@ -468,6 +468,29 @@ class PointCloud:
         The mapping holds only the dimensions the cloud actually carries - the standard attribute table where
         populated, plus any extra (``ExtraBytes``) dimensions. It is a fresh dict (mutating it does not change
         the cloud), though the arrays inside are the cloud's own.
+
+        Examples:
+            - The mapping holds exactly the attributes the cloud was built with, standard or extra:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2),
+                ...                    classification=np.array([2, 5], dtype=np.uint8),
+                ...                    amplitude=np.array([1.5, 2.5], dtype=np.float32))
+                >>> sorted(cloud.attributes)
+                ['amplitude', 'classification']
+                >>> cloud.attributes["classification"].tolist()
+                [2, 5]
+
+                ```
+            - It is a fresh dict, so adding a key to it does not change the cloud:
+                ```python
+                >>> import numpy as np
+                >>> cloud = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2))
+                >>> cloud.attributes["classification"] = np.ones(2)
+                >>> "classification" in cloud.attributes
+                False
+
+                ```
         """
         return dict(self.load()._attributes)
 

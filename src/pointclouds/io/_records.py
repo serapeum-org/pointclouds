@@ -225,6 +225,22 @@ def extra_dimension_names(source: _RecordSource) -> tuple[str, ...]:
 
     Returns:
         The extra dimension names (lower-case), or an empty tuple when the file has none.
+
+    Examples:
+        A plain point format carries no extras:
+
+        >>> import laspy
+        >>> cloud = laspy.LasData(laspy.LasHeader(version="1.4", point_format=6))
+        >>> extra_dimension_names(cloud)
+        ()
+
+        A custom dimension added to the format shows up, lower-cased:
+
+        >>> import laspy
+        >>> header = laspy.LasHeader(version="1.4", point_format=6)
+        >>> header.add_extra_dim(laspy.ExtraBytesParams(name="Amplitude", type="f4"))
+        >>> extra_dimension_names(laspy.LasData(header))
+        ('amplitude',)
     """
     extra = getattr(source.point_format, "extra_dimension_names", None)
     if extra is None:
@@ -241,6 +257,28 @@ def extract_extra(source: _RecordSource) -> dict[str, np.ndarray]:
     Returns:
         A mapping of extra dimension name to array, keeping each dimension's own numpy dtype (unlike the
         canonical fields, extras are not cast). Empty when the file declares no extra dimensions.
+
+    Examples:
+        An extra dimension comes back by its own name and dtype, as an owning copy:
+
+        >>> import laspy
+        >>> import numpy as np
+        >>> header = laspy.LasHeader(version="1.4", point_format=6)
+        >>> header.add_extra_dim(laspy.ExtraBytesParams(name="amplitude", type="f4"))
+        >>> cloud = laspy.LasData(header)
+        >>> cloud.x = np.array([0.0, 1.0])
+        >>> cloud.amplitude = np.array([1.5, 2.5], dtype=np.float32)
+        >>> extras = extract_extra(cloud)
+        >>> extras["amplitude"].tolist()
+        [1.5, 2.5]
+        >>> extras["amplitude"].dtype.name
+        'float32'
+
+        A file with no extras yields an empty mapping:
+
+        >>> import laspy
+        >>> extract_extra(laspy.LasData(laspy.LasHeader(version="1.4", point_format=6)))
+        {}
     """
     return {name: np.array(getattr(source, name), copy=True) for name in extra_dimension_names(source)}
 
@@ -265,6 +303,26 @@ def clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, 
     Returns:
         The same mapping with every array masked to the points inside the box. A zero-length (undeclared)
         dimension is left untouched rather than indexed with a full-length mask.
+
+    Examples:
+        Only the points inside the (inclusive) box survive, every array masked in step:
+
+        >>> import numpy as np
+        >>> arrays = {"x": np.array([0.0, 1.0, 2.0]), "y": np.array([0.0, 1.0, 2.0]),
+        ...           "classification": np.array([2, 5, 2], dtype=np.uint8)}
+        >>> kept = clip_to_box(arrays, (0.0, 0.0, 1.0, 1.0))
+        >>> kept["x"].tolist()
+        [0.0, 1.0]
+        >>> kept["classification"].tolist()
+        [2, 5]
+
+        An undeclared (zero-length) dimension is left alone, never indexed by the mask:
+
+        >>> import numpy as np
+        >>> arrays = {"x": np.array([0.0, 9.0]), "y": np.array([0.0, 9.0]),
+        ...           "nir": np.empty(0, dtype=np.uint16)}
+        >>> clip_to_box(arrays, (-1.0, -1.0, 1.0, 1.0))["nir"].size
+        0
     """
     xmin, ymin, xmax, ymax = bbox
     x, y = arrays["x"], arrays["y"]
