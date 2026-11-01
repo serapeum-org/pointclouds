@@ -42,13 +42,6 @@ from pointclouds.ops import merge as _merge
 
 __all__ = ["PointCloud"]
 
-#: The canonical non-coordinate dimension names, in the order :meth:`PointCloud.dimensions` reports them, with
-#: the dtype each is held as. Derived from the shared record contract so the container, the LAS/COPC/EPT engines
-#: and the write path never drift on which attributes exist or how they are typed.
-_ATTRIBUTE_DTYPES: dict[str, type] = {
-    name: dtype for name, dtype in _records.CANONICAL.items() if name not in ("x", "y", "z")
-}
-
 
 class PointCloud:
     """In-memory point cloud: parallel per-dimension arrays plus a CRS.
@@ -571,11 +564,17 @@ class PointCloud:
         except KeyError as exc:
             raise KeyError(f"unknown dimension {exc.args[0]!r}; this cloud holds {sorted(lookup)}") from None
         width = len(self._x)
-        empty = [name for name, col in zip(dimensions, cols, strict=True) if col.size != width]
-        if empty:
+        absent = [name for name, col in zip(dimensions, cols, strict=True) if col.size == 0]
+        non_scalar = [name for name, col in zip(dimensions, cols, strict=True) if col.size and col.shape != (width,)]
+        if absent:
             raise ValueError(
-                f"cannot stack dimension(s) {empty} - this cloud carries none of them ({width} points, but "
+                f"cannot stack dimension(s) {absent} - this cloud carries none of them ({width} points, but "
                 f"those arrays are empty); request only the dimensions it holds"
+            )
+        if non_scalar:
+            raise ValueError(
+                f"cannot stack dimension(s) {non_scalar} - they are not a single per-point scalar column "
+                f"(a vector/multi-element extra); to_array stacks only 1-D (N,) dimensions"
             )
         return np.column_stack(cols)
 

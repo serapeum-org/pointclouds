@@ -603,3 +603,22 @@ class TestMergeWidenedAttributes:
 
         with pytest.raises(ValueError, match="present on some"):
             PointCloud.merge([a, b])
+
+
+class TestToArrayVectorDiagnostic:
+    """to_array distinguishes a present-but-non-1-D dimension from an absent one (R2-N1)."""
+
+    def test_a_vector_dimension_is_reported_as_non_scalar_not_absent(self):
+        """Stacking a present (N, k) extra fails with a 'not a single column' message, not 'carries none'."""
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3),
+                           rgb3=np.zeros((3, 3), dtype=np.uint8))
+
+        with pytest.raises(ValueError, match="not a single column|per-point scalar"):
+            cloud.to_array(("x", "rgb3"))
+
+    def test_an_absent_dimension_still_says_carries_none(self):
+        """A genuinely absent dimension keeps the 'carries none of them' wording."""
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3))
+
+        with pytest.raises(ValueError, match="carries none of them"):
+            cloud.to_array(("x", "intensity"))
