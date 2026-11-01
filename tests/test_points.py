@@ -633,3 +633,17 @@ class TestToArrayVectorDiagnostic:
 
         with pytest.raises(ValueError, match="carries none of them"):
             cloud.to_array(("x", "intensity"))
+
+
+class TestMergeWithEmptyCloud:
+    """A zero-point cloud contributes no rows and does not dictate attribute presence (merge filler path)."""
+
+    def test_an_empty_cloud_is_a_noop_participant(self):
+        """Merging a populated cloud (with gps_time) and an empty one keeps gps_time, from the one that had it."""
+        full = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2), gps_time=np.array([1.0, 2.0]))
+        empty = PointCloud(x=np.empty(0), y=np.empty(0), z=np.empty(0))
+
+        merged = PointCloud.merge([full, empty])
+
+        assert len(merged) == 2
+        assert merged.gps_time.tolist() == [1.0, 2.0]
