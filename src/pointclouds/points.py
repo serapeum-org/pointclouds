@@ -471,8 +471,9 @@ class PointCloud:
         """The per-point attribute arrays by name, loading the records first if needed.
 
         The mapping holds only the dimensions the cloud actually carries - the standard attribute table where
-        populated, plus any extra (``ExtraBytes``) dimensions. It is a fresh dict (mutating it does not change
-        the cloud), though the arrays inside are the cloud's own.
+        populated, plus any extra (``ExtraBytes``) dimensions. It is a fresh dict, so adding or removing a key
+        does not change the cloud; the arrays inside are the cloud's own, so editing one *in place* does reach
+        the cloud (copy an array first if that matters).
 
         Examples:
             - The mapping holds exactly the attributes the cloud was built with, standard or extra:
