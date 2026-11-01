@@ -555,3 +555,22 @@ class TestToArrayEmptyDimension:
 
         with pytest.raises(ValueError, match="intensity"):
             cloud.to_array(("X", "intensity"))
+
+
+class TestConstructorKeywordOnlyCrs:
+    """`crs` is keyword-only, so a stray positional attribute can't silently become the CRS (H1)."""
+
+    def test_a_positional_fourth_argument_is_refused(self):
+        """A 4th positional arg (the old `intensity` slot) raises TypeError instead of binding to crs.
+
+        Before this was keyword-only, PointCloud(x, y, z, intensity_array) bound the array to `crs` silently and
+        dropped the intensity; now it fails loudly.
+        """
+        with pytest.raises(TypeError):
+            PointCloud(np.zeros(3), np.zeros(3), np.zeros(3), np.ones(3, np.uint16))
+
+    def test_crs_still_works_by_keyword(self):
+        """Passing crs by keyword is unaffected."""
+        cloud = PointCloud(x=np.zeros(1), y=np.zeros(1), z=np.zeros(1), crs="EPSG:28992")
+
+        assert cloud.crs.to_epsg() == 28992

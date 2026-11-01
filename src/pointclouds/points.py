@@ -80,6 +80,7 @@ class PointCloud:
         x: np.ndarray,
         y: np.ndarray,
         z: np.ndarray,
+        *,
         crs: CRS | str | None = None,
         **attributes: np.ndarray | None,
     ) -> None:
