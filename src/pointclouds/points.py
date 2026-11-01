@@ -423,7 +423,9 @@ class PointCloud:
     def scan_angle(self) -> np.ndarray:
         """``(N,)`` int16 scan angle (empty when absent), loading the records first if needed.
 
-        Read from ``scan_angle`` on point formats 6-10 and ``scan_angle_rank`` on formats 0-5.
+        This is the LAS 1.4 ``scan_angle`` field (point formats 6-10, 0.006-degree increments). The legacy
+        ``scan_angle_rank`` of formats 0-5 uses different units and is not mapped onto this field, so it reads
+        back empty on a pre-1.4 file.
         """
         return self._attribute("scan_angle")
 

@@ -250,8 +250,8 @@ def write(
     las.x, las.y, las.z = x, y, z
     for name in standard:
         if attributes[name].size:
-            # scan_angle is spelled scan_angle_rank on point formats 0-5, but write targets 6-8, so the
-            # canonical name is always the right field here.
+            # write targets point formats 6-8, which declare every canonical standard dimension by its canonical
+            # name (scan_angle, not the legacy scan_angle_rank), so each name is the right field here.
             setattr(las, name, attributes[name])
     for name in extra:
         setattr(las, name, attributes[name])

@@ -247,3 +247,39 @@ class TestEdgeCases:
         assert cloud.scan_angle.tolist() == [-5, 5]
         assert cloud.point_source_id.tolist() == [1, 2]
         assert cloud.user_data.tolist() == [7, 8]
+
+
+class TestScanAngleUnits:
+    """`scan_angle` maps only the LAS 1.4 field, never the differently-scaled legacy scan_angle_rank (H2)."""
+
+    def test_a_legacy_scan_angle_rank_is_not_read_as_scan_angle(self, tmp_path):
+        """A point-format-3 file (scan_angle_rank, whole degrees) must not surface as the canonical scan_angle.
+
+        scan_angle_rank (pf0-5) is int8 whole degrees; scan_angle (pf6-10) is int16 in 0.006deg increments.
+        Mapping one onto the other would silently change the physical meaning on a cross-format write, so the
+        legacy field is left unmapped (absent) rather than conflated.
+        """
+        import laspy
+
+        header = laspy.LasHeader(version="1.2", point_format=3)
+        header.scales = [0.01, 0.01, 0.01]
+        las_data = laspy.LasData(header)
+        las_data.x = np.array([0.0, 1.0])
+        las_data.y = np.array([0.0, 1.0])
+        las_data.z = np.array([0.0, 0.0])
+        las_data.scan_angle_rank = np.array([-15, 15], dtype=np.int8)
+        las_data.write(str(tmp_path / "pf3.laz"))
+
+        cloud = PointCloud.read_file(tmp_path / "pf3.laz", lazy=False)
+        assert cloud.scan_angle.size == 0, "a legacy scan_angle_rank must not be read as the canonical scan_angle"
+
+    def test_a_scan_angle_round_trips_on_a_modern_format(self, tmp_path):
+        """A point-format-6 scan_angle (int16, the canonical field) survives a write/read unchanged."""
+        cloud = PointCloud(
+            x=np.zeros(3), y=np.zeros(3), z=np.zeros(3),
+            scan_angle=np.array([-2500, 0, 2500], dtype=np.int16),
+            gps_time=np.zeros(3),  # force point format 6
+        )
+        out = cloud.to_file(tmp_path / "pf6.laz")
+
+        assert PointCloud.read_file(out, lazy=False).scan_angle.tolist() == [-2500, 0, 2500]

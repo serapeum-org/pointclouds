@@ -39,6 +39,9 @@ CANONICAL: dict[str, type] = {
     "return_number": np.uint8,
     "number_of_returns": np.uint8,
     "classification": np.uint8,
+    # The LAS 1.4 scan_angle field (point formats 6-10), an int16 in 0.006-degree increments. The legacy
+    # scan_angle_rank of point formats 0-5 (int8, whole degrees) has different units and is deliberately not
+    # mapped onto this name, so a cross-format read/write never silently rescales the angle.
     "scan_angle": np.int16,
     "user_data": np.uint8,
     "point_source_id": np.uint16,
@@ -52,13 +55,6 @@ CANONICAL: dict[str, type] = {
 #: The coordinate dimensions. laspy always exposes these as scaled doubles, whatever the point format declares,
 #: so they are never treated as absent.
 _COORDINATES = ("x", "y", "z")
-
-#: A few canonical names laspy spells differently depending on the point format; the first source attribute that
-#: the format actually declares wins. The scan angle is ``scan_angle`` on point formats 6-10 (a scaled int16) and
-#: ``scan_angle_rank`` on formats 0-5 (an int8); both are read into the canonical ``scan_angle`` field.
-_SOURCE_ALIASES: dict[str, tuple[str, ...]] = {
-    "scan_angle": ("scan_angle", "scan_angle_rank"),
-}
 
 
 class _RecordSource(Protocol):
@@ -185,33 +181,15 @@ def extract(source: _RecordSource, requested: tuple[str, ...]) -> dict[str, np.n
     arrays: dict[str, np.ndarray] = {}
     for name in requested:
         dtype = CANONICAL[name]
-        source_name = _source_attr(name, declared)
-        if name in _COORDINATES or source_name is not None:
+        if name in _COORDINATES or name in declared:
             # Always a copy, never a view. np.asarray would alias when the dtype already matches, and on the
             # COPC path the source is one packed record buffer - a view would keep the whole buffer alive behind
             # a single-column result and let a caller mutate the source through it. The two engines must agree,
             # and the LAS path copies, so this one does too.
-            arrays[name] = np.array(getattr(source, source_name or name), dtype=dtype, copy=True)
+            arrays[name] = np.array(getattr(source, name), dtype=dtype, copy=True)
         else:
             arrays[name] = np.empty(0, dtype=dtype)
     return arrays
-
-
-def _source_attr(canonical: str, declared: set[str]) -> str | None:
-    """Return the source attribute name that feeds ``canonical``, or ``None`` when the format omits it.
-
-    Args:
-        canonical: a canonical dimension name (a key of :data:`CANONICAL`).
-        declared: the lower-case names the source's point format declares (from :func:`declared_names`).
-
-    Returns:
-        The declared source attribute to read - ``canonical`` itself, or an alias (e.g. ``scan_angle_rank`` for
-        ``scan_angle`` on an older point format) - or ``None`` when neither is declared.
-    """
-    for candidate in _SOURCE_ALIASES.get(canonical, (canonical,)):
-        if candidate in declared:
-            return candidate
-    return None
 
 
 def extra_dimension_names(source: _RecordSource) -> tuple[str, ...]:
