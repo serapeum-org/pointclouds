@@ -207,3 +207,43 @@ class TestPreferWkt:
         las.read_header(out)
 
         assert seen.get("prefer_wkt") is True, "read_header should ask for WKT preference explicitly"
+
+
+class TestEdgeCases:
+    """The remaining branches: an empty standard dim on write, a None attribute, the rarer properties."""
+
+    def test_write_skips_a_present_but_empty_standard_dimension(self, tmp_path):
+        """A standard attribute given as a zero-length array is treated as absent and simply not written."""
+        las.write(
+            tmp_path / "empty_attr.laz",
+            np.zeros(3),
+            np.zeros(3),
+            np.zeros(3),
+            attributes={"classification": np.array([], dtype=np.uint8), "intensity": np.ones(3, np.uint16)},
+        )
+
+        back = PointCloud.read_file(tmp_path / "empty_attr.laz", lazy=False)
+        assert np.array_equal(back.intensity, np.ones(3, np.uint16))
+        assert set(np.unique(back.classification)) == {0}, "an unwritten classification defaults to zero"
+
+    def test_a_none_attribute_is_dropped(self):
+        """Passing an attribute as None means absent - it is not carried and reads back empty."""
+        cloud = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2), intensity=None)
+
+        assert "intensity" not in cloud.attributes
+        assert cloud.intensity.size == 0
+
+    def test_the_rarer_standard_properties_are_exposed(self):
+        """scan_angle / point_source_id / user_data are reachable as properties, full-length when carried."""
+        cloud = PointCloud(
+            x=np.zeros(2),
+            y=np.zeros(2),
+            z=np.zeros(2),
+            scan_angle=np.array([-5, 5], dtype=np.int16),
+            point_source_id=np.array([1, 2], dtype=np.uint16),
+            user_data=np.array([7, 8], dtype=np.uint8),
+        )
+
+        assert cloud.scan_angle.tolist() == [-5, 5]
+        assert cloud.point_source_id.tolist() == [1, 2]
+        assert cloud.user_data.tolist() == [7, 8]
