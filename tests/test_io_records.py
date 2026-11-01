@@ -276,3 +276,29 @@ class TestExtractAlwaysCopies:
 
         assert values[0] == 2, "extract returned a view; mutating the result reached the source"
         assert arrays["classification"].base is None, "the returned array should own its data"
+
+
+class TestExtraDimensionCollision:
+    """An extra dimension whose name is a canonical one must not clobber the standard field (M1)."""
+
+    class _FormatWithExtras:
+        """A point format that lists some extra dimension names, one colliding with a canonical key."""
+
+        def __init__(self, dimension_names, extra_dimension_names):
+            self.dimension_names = dimension_names
+            self.extra_dimension_names = extra_dimension_names
+
+    def test_a_canonical_named_extra_is_excluded_from_the_extras(self):
+        """`extra_dimension_names` drops a name that is already a canonical dimension, keeping genuine extras.
+
+        A file with an ExtraBytes dimension named like a standard LAS field (e.g. `gps_time`) would otherwise
+        overwrite the canonical entry on the `arrays.update(extract_extra(...))` merge and be mis-cast.
+        """
+        fmt = self._FormatWithExtras(
+            dimension_names=("X", "Y", "Z", "gps_time", "amplitude"),
+            extra_dimension_names=("gps_time", "Amplitude"),
+        )
+        source = _Source(fmt)
+
+        names = _records.extra_dimension_names(source)
+        assert names == ("amplitude",), f"a canonical-named extra must be excluded; got {names}"

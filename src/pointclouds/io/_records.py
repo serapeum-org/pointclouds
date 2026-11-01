@@ -196,13 +196,15 @@ def extra_dimension_names(source: _RecordSource) -> tuple[str, ...]:
     """Return the names of any extra (``ExtraBytes``) dimensions the source carries, in file order.
 
     These are the non-standard, per-file custom dimensions - anything the point format declares that is not one
-    of the canonical LAS fields. They pass through read and write by their own name and native dtype.
+    of the canonical LAS fields. They pass through read and write by their own name and native dtype. A name
+    that collides with a canonical dimension is **excluded**: that dimension is read through the canonical path
+    instead, so a custom dimension named like a standard field can never overwrite or mis-cast it.
 
     Args:
         source: a laspy record source (``LasData`` or ``ScaleAwarePointRecord``).
 
     Returns:
-        The extra dimension names (lower-case), or an empty tuple when the file has none.
+        The extra dimension names (lower-case), minus any that are canonical, or an empty tuple when none.
 
     Examples:
         A plain point format carries no extras:
@@ -223,7 +225,7 @@ def extra_dimension_names(source: _RecordSource) -> tuple[str, ...]:
     extra = getattr(source.point_format, "extra_dimension_names", None)
     if extra is None:
         return ()
-    return tuple(str(name).lower() for name in extra)
+    return tuple(name for name in (str(n).lower() for n in extra) if name not in CANONICAL)
 
 
 def extract_extra(source: _RecordSource) -> dict[str, np.ndarray]:
