@@ -68,8 +68,10 @@ class TestAttributeTable:
         """A dimension the cloud does not carry reads back as a zero-length array of the canonical dtype."""
         cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3))
 
-        assert cloud.nir.size == 0 and cloud.nir.dtype == np.uint16
-        assert cloud.gps_time.size == 0 and cloud.gps_time.dtype == np.float64
+        assert cloud.nir.size == 0
+        assert cloud.nir.dtype == np.uint16
+        assert cloud.gps_time.size == 0
+        assert cloud.gps_time.dtype == np.float64
 
 
 class TestWriteRoundTrip:

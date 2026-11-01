@@ -527,7 +527,8 @@ class TestReadWindowDimensions:
         assert set(cloud.attributes) == set(attrs), (
             "every canonical attribute should round-trip through the constructor"
         )
-        assert cloud.gps_time.shape == (3,) and cloud.red.shape == (3,), "new standard dims are exposed as properties"
+        assert cloud.gps_time.shape == (3,), "gps_time is exposed as a property"
+        assert cloud.red.shape == (3,), "red is exposed as a property"
 
 
 class TestReadFileWindowGuards:
