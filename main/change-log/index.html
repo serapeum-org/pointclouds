@@ -64,7 +64,7 @@
     
     
   <meta name="panzoom-theme" content="material">
-<meta name="panzoom-data" content='{"selectors": [".mermaid", ".d2"], "initial_zoom_level": 1.0}'> </head>
+<meta name="panzoom-data" content='{"selectors": [".d2", ".mermaid"], "initial_zoom_level": 1.0}'> </head>
   
   
     
@@ -794,6 +794,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#020-2026-11-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.0 (2026-11-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.0 (2026-11-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#breaking-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BREAKING CHANGE
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#010-2026-10-26" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -806,7 +845,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#feat" class="md-nav__link">
+  <a href="#feat_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Feat
@@ -1086,6 +1125,45 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#020-2026-11-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        0.2.0 (2026-11-01)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="0.2.0 (2026-11-01)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#breaking-change" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        BREAKING CHANGE
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#feat" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Feat
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#010-2026-10-26" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1098,7 +1176,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#feat" class="md-nav__link">
+  <a href="#feat_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Feat
@@ -1147,6 +1225,19 @@
 
 
 <h1 id="changelog"><a class="toclink" href="#changelog">Changelog</a><a class="headerlink" href="#changelog" title="Permanent link">#</a></h1>
+<h2 id="020-2026-11-01"><a class="toclink" href="#020-2026-11-01">0.2.0 (2026-11-01)</a><a class="headerlink" href="#020-2026-11-01" title="Permanent link">#</a></h2>
+<h3 id="breaking-change"><a class="toclink" href="#breaking-change">BREAKING CHANGE</a><a class="headerlink" href="#breaking-change" title="Permanent link">#</a></h3>
+<ul>
+<li>PointCloud.<strong>init</strong> no longer takes intensity,
+classification or return_number as positional/named parameters and crs
+is keyword-only. Pass every per-point attrib
+(PointCloud(x, y, z, crs=..., classification=...)); a positional 4th
+argument now raises TypeError instead of bin</li>
+</ul>
+<h3 id="feat"><a class="toclink" href="#feat">Feat</a><a class="headerlink" href="#feat" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>io</strong>: complete the LAS/LAZ reader — full attribute table, streaming, write round-trip (#20)</li>
+</ul>
 <h2 id="010-2026-10-26"><a class="toclink" href="#010-2026-10-26">0.1.0 (2026-10-26)</a><a class="headerlink" href="#010-2026-10-26" title="Permanent link">#</a></h2>
 <ul>
 <li>PointCloud is no longer a dataclass, so it no longer
@@ -1154,7 +1245,7 @@ has a generated <strong>eq</strong> and two clouds compare by identity. The
 generated <strong>eq</strong> already raised "truth value of an array is ambiguous"
 on any cloud with array fields, so no working comparison is lost.</li>
 </ul>
-<h3 id="feat"><a class="toclink" href="#feat">Feat</a><a class="headerlink" href="#feat" title="Permanent link">#</a></h3>
+<h3 id="feat_1"><a class="toclink" href="#feat_1">Feat</a><a class="headerlink" href="#feat_1" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>io</strong>: add COPC and EPT spatially-indexed windowed reads (#13)</li>
 <li><strong>ops</strong>: add filter, decimate, clip, merge and to_grid to PointCloud (#12)</li>
