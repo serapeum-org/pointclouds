@@ -302,3 +302,26 @@ class TestExtraDimensionCollision:
 
         names = _records.extra_dimension_names(source)
         assert names == ("amplitude",), f"a canonical-named extra must be excluded; got {names}"
+
+
+class TestClipToBoxVectorAlignment:
+    """clip_to_box must mask a vector (N, k) array on its point axis, in step with x/y (R2-M1)."""
+
+    def test_a_vector_array_is_masked_in_step(self):
+        """A (N, k) array is masked on its first axis, not left whole while x/y shrink (which would misalign)."""
+        arrays = {
+            "x": np.array([0.0, 5.0, 1.0]),
+            "y": np.array([0.0, 5.0, 1.0]),
+            "vecdim": np.array([[1, 1], [2, 2], [3, 3]], dtype=np.uint8),
+        }
+
+        kept = _records.clip_to_box(arrays, (-1.0, -1.0, 2.0, 2.0))
+
+        assert kept["x"].tolist() == [0.0, 1.0], "x should drop the out-of-box point"
+        assert kept["vecdim"].tolist() == [[1, 1], [3, 3]], "the vector dim must drop the same row"
+
+    def test_an_absent_dimension_is_left_untouched(self):
+        """A zero-length (absent) array is not indexed by the mask."""
+        arrays = {"x": np.array([0.0, 9.0]), "y": np.array([0.0, 9.0]), "nir": np.empty(0, dtype=np.uint16)}
+
+        assert _records.clip_to_box(arrays, (-1.0, -1.0, 1.0, 1.0))["nir"].size == 0

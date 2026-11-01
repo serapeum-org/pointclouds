@@ -307,4 +307,6 @@ def clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, 
     xmin, ymin, xmax, ymax = bbox
     x, y = arrays["x"], arrays["y"]
     keep = (x >= xmin) & (x <= xmax) & (y >= ymin) & (y <= ymax)
-    return {name: (values[keep] if values.size == keep.size else values) for name, values in arrays.items()}
+    # Mask on the point axis: a full-length array (1-D or a vector (N, k) extra) is masked on its first axis in
+    # step with x/y; a zero-length (undeclared/absent) array is left alone rather than indexed.
+    return {name: (values[keep] if len(values) == len(keep) else values) for name, values in arrays.items()}
