@@ -16,7 +16,7 @@ import pytest
 from pyproj import CRS
 
 from pointclouds import PointCloud
-from pointclouds.io import ept
+from pointclouds.io import _records, ept
 
 EXPECTED_COUNT = 1600
 EXPECTED_BOUNDS = (155000.0, 463000.0, 155078.0, 463078.0)
@@ -132,8 +132,9 @@ class TestBoundingBoxWindow:
         """A window returns the same dimension set, dtypes and alignment as every other reader."""
         arrays = ept.read_window(any_ept, bbox=CORNER_BBOX)
 
-        assert set(arrays) == {"x", "y", "z", "intensity", "classification", "return_number"}
-        assert all(values.shape == (CORNER_COUNT,) for values in arrays.values())
+        assert set(arrays) == set(_records.CANONICAL), "a window is keyed by every canonical dimension"
+        for name in ("x", "y", "z", "intensity", "classification", "return_number"):
+            assert arrays[name].shape == (CORNER_COUNT,), f"{name} should be full length"
         assert arrays["x"].dtype == np.float64
         assert arrays["intensity"].dtype == np.uint16
         assert arrays["classification"].dtype == np.uint8
@@ -237,7 +238,7 @@ class TestRejections:
 
     def test_an_unknown_dimension_is_refused(self, sample_ept):
         """An unknown dimension fails loudly, listing what the engine reads."""
-        with pytest.raises(KeyError, match="unknown dimension"):
+        with pytest.raises(KeyError, match="unknown standard dimension"):
             ept.read_window(sample_ept, dimensions=("nosuchdim",))
 
     def test_zstandard_is_refused_with_a_clear_message(self, tmp_path, sample_ept):

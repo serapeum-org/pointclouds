@@ -23,9 +23,9 @@ A COPC source may be a local path or a file object exposing ``read`` / ``seek`` 
 client: open the object with ``fsspec`` (the ``[cloud]`` extra) and pass it in. The handle must be seekable -
 COPC is a random-access format - and it stays the caller's to close.
 
-**EPT is not implemented here yet.** An Entwine tileset is a directory of files behind an ``ept.json`` rather
-than a single indexed file, and ``laspy`` has no reader for it, so it needs its own traversal and fetch path -
-the second half of the issue this module closes the first half of.
+**EPT lives in its sibling** :mod:`pointclouds.io.ept`. An Entwine tileset is a directory of files behind an
+``ept.json`` rather than a single indexed file, so it needs its own traversal and fetch path; both engines hand
+back the same windowed-read surface and share the record contract in :mod:`pointclouds.io._records`.
 
 **A corrupt octree reads short, silently.** laspy skips hierarchy entries it cannot parse, so a truncated or
 partially-transferred COPC - one whose hierarchy EVLR is damaged but whose header still parses - reads back as a
@@ -309,7 +309,7 @@ def read_header(source: Source) -> CopcHeaderInfo:
         return CopcHeaderInfo(
             count=int(header.point_count),
             bounds=(float(header.x_min), float(header.y_min), float(header.x_max), float(header.y_max)),
-            crs=header.parse_crs(),
+            crs=header.parse_crs(prefer_wkt=True),
             dimensions=tuple(str(name) for name in header.point_format.dimension_names),
             version=str(header.version),
             point_format=int(header.point_format.id),
@@ -565,6 +565,6 @@ def _read_window_with_crs(
     """
     requested = _validate_window(bbox, resolution, level, dimensions)  # before the open: no I/O on bad input
     with _reader(source) as reader:
-        crs = reader.header.parse_crs()
+        crs = reader.header.parse_crs(prefer_wkt=True)
         arrays = _query_window(reader, bbox=bbox, resolution=resolution, level=level, requested=requested)
         return crs, arrays

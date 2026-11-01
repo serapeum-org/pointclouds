@@ -510,19 +510,24 @@ class TestReadWindowDimensions:
         assert cloud.z.shape == (121,)
         assert cloud.classification.size == 0
 
-    def test_canonical_dimensions_match_the_constructor(self):
-        """`cls(crs=crs, **arrays)` depends on CANONICAL's keys being exactly the ctor's point parameters.
+    def test_the_constructor_accepts_every_canonical_attribute_by_keyword(self):
+        """`cls(crs=crs, **arrays)` relies on the constructor taking each canonical dimension as a keyword.
 
-        If either side moves, the splat breaks at a call site; this makes it fail loudly here instead.
+        The constructor captures ``**attributes``, so every canonical non-coordinate dimension round-trips
+        through it onto :attr:`PointCloud.attributes`; if a name stopped being accepted the splat would break
+        at a call site, and this fails loudly here instead.
         """
-        import inspect
-
         from pointclouds.io import _records
 
-        params = set(inspect.signature(PointCloud.__init__).parameters) - {"self", "crs"}
-        assert set(_records.CANONICAL) == params, (
-            f"CANONICAL {sorted(_records.CANONICAL)} drifted from ctor params {sorted(params)}"
+        attrs = {
+            name: np.zeros(3, dtype=dtype) for name, dtype in _records.CANONICAL.items() if name not in ("x", "y", "z")
+        }
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3), **attrs)
+
+        assert set(cloud.attributes) == set(attrs), (
+            "every canonical attribute should round-trip through the constructor"
         )
+        assert cloud.gps_time.shape == (3,) and cloud.red.shape == (3,), "new standard dims are exposed as properties"
 
 
 class TestReadFileWindowGuards:

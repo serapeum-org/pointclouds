@@ -17,22 +17,48 @@ from typing import Any, Protocol
 
 import numpy as np
 
-__all__ = ["CANONICAL", "clip_to_box", "declared_names", "extract", "resolve"]
+__all__ = [
+    "CANONICAL",
+    "clip_to_box",
+    "declared_names",
+    "extra_dimension_names",
+    "extract",
+    "extract_extra",
+    "resolve",
+]
 
-#: Record dimensions the engines map onto :class:`~pointclouds.points.PointCloud` fields, with the dtype each
-#: array is cast to. Keys are lower-case; callers may pass any case (``"X"`` and ``"x"`` are the same dimension).
+#: Standard LAS dimensions the engines map onto :class:`~pointclouds.points.PointCloud` fields, with the dtype
+#: each array is cast to. Keys are lower-case; callers may pass any case (``"X"`` and ``"x"`` are one dimension).
+#: This is the full standard attribute table; a given file's point format carries only some of these, and a
+#: dimension the format omits reads back as a zero-length array (the "empty means absent" convention).
 CANONICAL: dict[str, type] = {
     "x": np.float64,
     "y": np.float64,
     "z": np.float64,
     "intensity": np.uint16,
-    "classification": np.uint8,
     "return_number": np.uint8,
+    "number_of_returns": np.uint8,
+    "classification": np.uint8,
+    "scan_angle": np.int16,
+    "user_data": np.uint8,
+    "point_source_id": np.uint16,
+    "gps_time": np.float64,
+    "red": np.uint16,
+    "green": np.uint16,
+    "blue": np.uint16,
+    "nir": np.uint16,
 }
 
 #: The coordinate dimensions. laspy always exposes these as scaled doubles, whatever the point format declares,
 #: so they are never treated as absent.
 _COORDINATES = ("x", "y", "z")
+
+#: A few canonical names laspy spells differently depending on the point format; the first source attribute that
+#: the format actually declares wins. The scan angle is ``scan_angle`` on point formats 6-10 (a scaled int16) and
+#: ``scan_angle_rank`` on formats 0-5 (an int8); both are read into the canonical ``scan_angle`` field.
+_SOURCE_ALIASES: dict[str, tuple[str, ...]] = {
+    "scan_angle": ("scan_angle", "scan_angle_rank"),
+}
 
 
 class _RecordSource(Protocol):
@@ -65,16 +91,17 @@ def resolve(dimensions: tuple[str, ...] | None) -> tuple[str, ...]:
 
         ``None`` is the "everything this package maps" request, which is what both engines pass by default:
 
-        >>> resolve(None)
-        ('x', 'y', 'z', 'intensity', 'classification', 'return_number')
+        >>> resolve(None)[:4]
+        ('x', 'y', 'z', 'intensity')
 
         A dimension the package does not map is refused rather than quietly returned empty:
 
-        >>> resolve(("x", "gps_time"))
+        >>> resolve(("x", "elevation_percentile"))
         Traceback (most recent call last):
             ...
-        KeyError: "unknown dimension(s) ['gps_time']; this engine reads ['classification', 'intensity', \
-'return_number', 'x', 'y', 'z']"
+        KeyError: "unknown standard dimension(s) ['elevation_percentile']; this engine reads \
+['blue', 'classification', 'gps_time', 'green', 'intensity', 'nir', 'number_of_returns', 'point_source_id', \
+'red', 'return_number', 'scan_angle', 'user_data', 'x', 'y', 'z']"
     """
     if dimensions is None:
         return tuple(CANONICAL)
@@ -83,7 +110,7 @@ def resolve(dimensions: tuple[str, ...] | None) -> tuple[str, ...]:
     requested = tuple(dict.fromkeys(name.lower() for name in dimensions))
     unknown = [name for name in requested if name not in CANONICAL]
     if unknown:
-        raise KeyError(f"unknown dimension(s) {unknown}; this engine reads {sorted(CANONICAL)}")
+        raise KeyError(f"unknown standard dimension(s) {unknown}; this engine reads {sorted(CANONICAL)}")
     return requested
 
 
@@ -158,15 +185,64 @@ def extract(source: _RecordSource, requested: tuple[str, ...]) -> dict[str, np.n
     arrays: dict[str, np.ndarray] = {}
     for name in requested:
         dtype = CANONICAL[name]
-        if name in _COORDINATES or name in declared:
+        source_name = _source_attr(name, declared)
+        if name in _COORDINATES or source_name is not None:
             # Always a copy, never a view. np.asarray would alias when the dtype already matches, and on the
             # COPC path the source is one packed record buffer - a view would keep the whole buffer alive behind
             # a single-column result and let a caller mutate the source through it. The two engines must agree,
             # and the LAS path copies, so this one does too.
-            arrays[name] = np.array(getattr(source, name), dtype=dtype, copy=True)
+            arrays[name] = np.array(getattr(source, source_name or name), dtype=dtype, copy=True)
         else:
             arrays[name] = np.empty(0, dtype=dtype)
     return arrays
+
+
+def _source_attr(canonical: str, declared: set[str]) -> str | None:
+    """Return the source attribute name that feeds ``canonical``, or ``None`` when the format omits it.
+
+    Args:
+        canonical: a canonical dimension name (a key of :data:`CANONICAL`).
+        declared: the lower-case names the source's point format declares (from :func:`declared_names`).
+
+    Returns:
+        The declared source attribute to read - ``canonical`` itself, or an alias (e.g. ``scan_angle_rank`` for
+        ``scan_angle`` on an older point format) - or ``None`` when neither is declared.
+    """
+    for candidate in _SOURCE_ALIASES.get(canonical, (canonical,)):
+        if candidate in declared:
+            return candidate
+    return None
+
+
+def extra_dimension_names(source: _RecordSource) -> tuple[str, ...]:
+    """Return the names of any extra (``ExtraBytes``) dimensions the source carries, in file order.
+
+    These are the non-standard, per-file custom dimensions - anything the point format declares that is not one
+    of the canonical LAS fields. They pass through read and write by their own name and native dtype.
+
+    Args:
+        source: a laspy record source (``LasData`` or ``ScaleAwarePointRecord``).
+
+    Returns:
+        The extra dimension names (lower-case), or an empty tuple when the file has none.
+    """
+    extra = getattr(source.point_format, "extra_dimension_names", None)
+    if extra is None:
+        return ()
+    return tuple(str(name).lower() for name in extra)
+
+
+def extract_extra(source: _RecordSource) -> dict[str, np.ndarray]:
+    """Pull every extra (``ExtraBytes``) dimension out of a source as owning copies of its native dtype.
+
+    Args:
+        source: a laspy record source (``LasData`` or ``ScaleAwarePointRecord``).
+
+    Returns:
+        A mapping of extra dimension name to array, keeping each dimension's own numpy dtype (unlike the
+        canonical fields, extras are not cast). Empty when the file declares no extra dimensions.
+    """
+    return {name: np.array(getattr(source, name), copy=True) for name in extra_dimension_names(source)}
 
 
 def clip_to_box(arrays: dict[str, np.ndarray], bbox: tuple[float, float, float, float]) -> dict[str, np.ndarray]:

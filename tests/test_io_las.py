@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from pyproj import CRS
 
-from pointclouds.io import las
+from pointclouds.io import _records, las
 
 #: The fixtures are generated on a 20 x 20 grid at 2 m spacing - see examples/data/make_sample.py.
 EXPECTED_COUNT = 400
@@ -47,14 +47,20 @@ def test_read_header_touches_no_point_records(sample_file, monkeypatch):
 
 
 def test_read_points_returns_every_canonical_dimension(sample_file):
-    """With no dimension list, every dimension the engine maps comes back, aligned and typed."""
+    """With no dimension list, every canonical dimension comes back; the ones the format carries are aligned.
+
+    The sample is point format 3, which declares the coordinates, intensity/return/classification, plus
+    gps_time and RGB - but no NIR, so NIR comes back empty (the "empty means absent" convention).
+    """
     arrays = las.read_points(sample_file)
 
-    assert set(arrays) == {"x", "y", "z", "intensity", "classification", "return_number"}
-    assert all(values.shape == (EXPECTED_COUNT,) for values in arrays.values())
+    assert set(_records.CANONICAL) <= set(arrays), "every canonical dimension must be keyed"
+    for name in ("x", "y", "z", "intensity", "classification", "return_number", "gps_time", "red", "green", "blue"):
+        assert arrays[name].shape == (EXPECTED_COUNT,), f"{name} should be full length on point format 3"
+    assert arrays["nir"].size == 0, "point format 3 carries no NIR, so it is empty"
     assert arrays["x"].dtype == np.float64
     assert arrays["intensity"].dtype == np.uint16
-    assert arrays["classification"].dtype == np.uint8
+    assert arrays["gps_time"].dtype == np.float64
     assert set(np.unique(arrays["classification"])) == {2, 5}
 
 
@@ -68,7 +74,7 @@ def test_read_points_honours_a_dimension_subset(sample_laz):
 
 def test_read_points_rejects_an_unknown_dimension(sample_laz):
     """An unknown dimension fails loudly, listing what the engine does read."""
-    with pytest.raises(KeyError, match="unknown dimension"):
+    with pytest.raises(KeyError, match="unknown standard dimension"):
         las.read_points(sample_laz, dimensions=("X", "nosuchdim"))
 
 

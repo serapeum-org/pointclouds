@@ -12,7 +12,10 @@ import pytest
 
 from pointclouds.io import _records
 
-ALL_DIMENSIONS = {"x", "y", "z", "intensity", "classification", "return_number"}
+#: Every canonical dimension the package maps (derived so the tests follow the contract, not a frozen copy).
+ALL_DIMENSIONS = set(_records.CANONICAL)
+#: The subset the ``full_source`` fixture actually declares and carries.
+FULL_SOURCE_DIMS = {"x", "y", "z", "intensity", "classification", "return_number"}
 
 
 class _PointFormat:
@@ -95,22 +98,22 @@ class TestResolve:
         "dimensions, unknown",
         [
             (("nosuchdim",), "nosuchdim"),
-            (("X", "gps_time"), "gps_time"),
-            (("RED",), "red"),
+            (("X", "elevation_percentile"), "elevation_percentile"),
+            (("HeightAboveGround",), "heightaboveground"),
         ],
     )
     def test_an_unknown_dimension_is_refused(self, dimensions, unknown):
-        """A dimension this package does not map fails loudly rather than coming back empty.
+        """A standard dimension this package does not map fails loudly rather than coming back empty.
 
         Args:
             dimensions: the requested dimension names.
             unknown: the name expected to be reported as unknown.
 
         Test scenario:
-            Names laspy may well declare - gps_time, red - are still not ones PointCloud holds, so asking for
-            them is a mistake worth naming, not an empty array.
+            A non-standard name (an extra/derived dimension, not part of the canonical LAS table) is not a
+            standard dimension `resolve` accepts, so asking for it by `dimensions=` is a mistake worth naming.
         """
-        with pytest.raises(KeyError, match="unknown dimension") as excinfo:
+        with pytest.raises(KeyError, match="unknown standard dimension") as excinfo:
             _records.resolve(dimensions)
 
         assert unknown in str(excinfo.value), f"the error should name {unknown!r}, got: {excinfo.value}"
@@ -137,7 +140,7 @@ class TestDeclaredNames:
         Test scenario:
             A format declaring upper-case coordinates reports them lower-cased, so membership tests work.
         """
-        assert _records.declared_names(full_source) == ALL_DIMENSIONS, "declared names should be lower-cased"
+        assert _records.declared_names(full_source) == FULL_SOURCE_DIMS, "declared names should be lower-cased"
 
     def test_a_sparse_format_declares_less(self):
         """A format that carries no attributes declares only its coordinates.
@@ -154,20 +157,23 @@ class TestExtract:
     """`extract` turns a record source into the mapping `PointCloud` is built from."""
 
     def test_every_requested_dimension_is_present_and_typed(self, full_source):
-        """The returned mapping is keyed by exactly what was asked for, with the canonical dtypes.
+        """The returned mapping is keyed by every canonical dimension, with the canonical dtypes.
 
         Test scenario:
-            A full request returns six aligned arrays, coordinates as float64 and attributes as their own
-            integer types.
+            A full request returns one entry per canonical dimension; the ones the source declares are aligned
+            arrays of the canonical dtype, and the ones it omits are zero-length (empty means absent).
         """
         arrays = _records.extract(full_source, _records.resolve(None))
 
         assert set(arrays) == ALL_DIMENSIONS, f"expected every canonical dimension, got {sorted(arrays)}"
-        assert all(values.shape == (2,) for values in arrays.values()), "arrays must stay aligned"
+        assert all(arrays[name].shape == (2,) for name in FULL_SOURCE_DIMS), "declared dims must stay aligned"
+        assert all(arrays[name].shape == (0,) for name in ALL_DIMENSIONS - FULL_SOURCE_DIMS), (
+            "an undeclared dimension must come back empty"
+        )
         assert arrays["x"].dtype == np.float64, f"x should be float64, got {arrays['x'].dtype}"
         assert arrays["intensity"].dtype == np.uint16, f"intensity should be uint16, got {arrays['intensity'].dtype}"
-        assert arrays["classification"].dtype == np.uint8, "classification should be uint8"
-        assert arrays["return_number"].dtype == np.uint8, "return_number should be uint8"
+        assert arrays["gps_time"].dtype == np.float64, "gps_time should be float64"
+        assert arrays["red"].dtype == np.uint16, "red should be uint16"
 
     def test_a_subset_returns_only_that_subset(self, full_source):
         """Asking for two dimensions reads two, which is what makes a partial read cheaper.
