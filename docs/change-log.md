@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.2.0 (2026-11-01)
+
+### BREAKING CHANGE
+
+- PointCloud.__init__ no longer takes intensity,
+classification or return_number as positional/named parameters and crs
+is keyword-only. Pass every per-point attrib
+(PointCloud(x, y, z, crs=..., classification=...)); a positional 4th
+argument now raises TypeError instead of bin
+
+### Feat
+
+- **io**: complete the LAS/LAZ reader — full attribute table, streaming, write round-trip (#20)
+
 ## 0.1.0 (2026-10-26)
 
 - PointCloud is no longer a dataclass, so it no longer
