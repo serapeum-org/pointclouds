@@ -276,7 +276,9 @@ class TestScanAngleUnits:
     def test_a_scan_angle_round_trips_on_a_modern_format(self, tmp_path):
         """A point-format-6 scan_angle (int16, the canonical field) survives a write/read unchanged."""
         cloud = PointCloud(
-            x=np.zeros(3), y=np.zeros(3), z=np.zeros(3),
+            x=np.zeros(3),
+            y=np.zeros(3),
+            z=np.zeros(3),
             scan_angle=np.array([-2500, 0, 2500], dtype=np.int16),
             gps_time=np.zeros(3),  # force point format 6
         )
@@ -295,7 +297,9 @@ class TestVectorExtraDimension:
         rejects a cloud that was read cleanly.
         """
         cloud = PointCloud(
-            x=np.zeros(2), y=np.zeros(2), z=np.zeros(2),
+            x=np.zeros(2),
+            y=np.zeros(2),
+            z=np.zeros(2),
             rgb3=np.array([[1, 2, 3], [4, 5, 6]], dtype=np.uint8),
         )
         out = cloud.to_file(tmp_path / "vec.laz")
@@ -308,7 +312,10 @@ class TestVectorExtraDimension:
         """A vector extra with the wrong number of points (not of total elements) is still rejected."""
         with pytest.raises(ValueError, match="length"):
             las.write(
-                tmp_path / "bad.laz", np.zeros(2), np.zeros(2), np.zeros(2),
+                tmp_path / "bad.laz",
+                np.zeros(2),
+                np.zeros(2),
+                np.zeros(2),
                 attributes={"rgb3": np.zeros((3, 3), dtype=np.uint8)},
             )
 
@@ -324,7 +331,9 @@ class TestWrittenFormatMaterializesDimensions:
         write/read round-trip.
         """
         cloud = PointCloud(
-            x=np.zeros(3), y=np.zeros(3), z=np.zeros(3),
+            x=np.zeros(3),
+            y=np.zeros(3),
+            z=np.zeros(3),
             classification=np.array([2, 2, 5], dtype=np.uint8),  # no gps_time
         )
         assert cloud.gps_time.size == 0, "the source cloud has no gps_time"
@@ -370,6 +379,9 @@ class TestInputValidationEdges:
         """An extra with more than two axes is refused with a message naming the limit, not a broadcast error."""
         with pytest.raises(ValueError, match="3 axes"):
             las.write(
-                tmp_path / "cube.laz", np.zeros(3), np.zeros(3), np.zeros(3),
+                tmp_path / "cube.laz",
+                np.zeros(3),
+                np.zeros(3),
+                np.zeros(3),
                 attributes={"cube": np.zeros((3, 2, 2), dtype=np.uint8)},
             )

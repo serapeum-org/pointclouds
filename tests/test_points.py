@@ -581,12 +581,24 @@ class TestMergeWidenedAttributes:
 
     def test_merge_preserves_every_shared_attribute(self):
         """Merging clouds that share gps_time / RGB / an extra keeps them all, concatenated in order."""
-        a = PointCloud(x=np.zeros(2), y=np.zeros(2), z=np.zeros(2),
-                       classification=np.array([2, 2], np.uint8), gps_time=np.array([1.0, 2.0]),
-                       red=np.array([10, 20], np.uint16), amplitude=np.array([0.5, 0.6], np.float32))
-        b = PointCloud(x=np.ones(1), y=np.ones(1), z=np.ones(1),
-                       classification=np.array([5], np.uint8), gps_time=np.array([3.0]),
-                       red=np.array([30], np.uint16), amplitude=np.array([0.7], np.float32))
+        a = PointCloud(
+            x=np.zeros(2),
+            y=np.zeros(2),
+            z=np.zeros(2),
+            classification=np.array([2, 2], np.uint8),
+            gps_time=np.array([1.0, 2.0]),
+            red=np.array([10, 20], np.uint16),
+            amplitude=np.array([0.5, 0.6], np.float32),
+        )
+        b = PointCloud(
+            x=np.ones(1),
+            y=np.ones(1),
+            z=np.ones(1),
+            classification=np.array([5], np.uint8),
+            gps_time=np.array([3.0]),
+            red=np.array([30], np.uint16),
+            amplitude=np.array([0.7], np.float32),
+        )
 
         merged = PointCloud.merge([a, b])
 
@@ -610,8 +622,7 @@ class TestToArrayVectorDiagnostic:
 
     def test_a_vector_dimension_is_reported_as_non_scalar_not_absent(self):
         """Stacking a present (N, k) extra fails with a 'not a single column' message, not 'carries none'."""
-        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3),
-                           rgb3=np.zeros((3, 3), dtype=np.uint8))
+        cloud = PointCloud(x=np.zeros(3), y=np.zeros(3), z=np.zeros(3), rgb3=np.zeros((3, 3), dtype=np.uint8))
 
         with pytest.raises(ValueError, match="not a single column|per-point scalar"):
             cloud.to_array(("x", "rgb3"))
